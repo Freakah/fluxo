@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
+import { AxeBuilder } from '@axe-core/playwright';
 import fs from 'node:fs';
 
 async function startDemo(page: Page) {
@@ -107,7 +107,8 @@ test('reports and CSV export', async ({ page }) => {
   await expect(page.getByRole('table').first()).toBeVisible();
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Export CSV' }).click()]);
   const csv = fs.readFileSync((await download.path())!, 'utf8');
-  expect(csv.replace(/^﻿/, '').split('\r\n')[0]).toBe('booking_date,value_date,status,account,merchant,bank_description,counterparty,amount,currency,pending_amount,type,category,category_source,excluded_from_reports,note,source');
+  expect(csv.charCodeAt(0)).toBe(0xfeff); // UTF-8 BOM so Excel reads accents
+  expect(csv.slice(1).split('\r\n')[0]).toBe('booking_date,value_date,status,account,merchant,bank_description,counterparty,amount,currency,pending_amount,type,category,category_source,excluded_from_reports,note,source');
   expect(csv).toContain('Pingo Doce');
   await a11y(page);
 });

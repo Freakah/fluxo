@@ -38,7 +38,7 @@ export function TxList({ rows, selected, onToggle, onOpen }: { rows: Tx[]; selec
             <span className="tx-what">
               <span className="tx-merchant">{t.merchant}</span>
               <span className="tx-sub">
-                {t.type !== 'transfer' && <span className="cat"><span className="dot" style={{ background: t.category_color ?? '#9e9e9e' }} aria-hidden="true" />{t.category_name ?? 'Uncategorized'}{t.confidence === 'low' && <span className="muted"> (check)</span>}</span>}
+                {t.type !== 'transfer' && <span className="cat"><span className="dot" style={{ background: t.category_color ?? '#9e9e9e' }} aria-hidden="true" />{t.category_name ?? 'Uncategorized'}{t.confidence === 'low' && <span className="muted">&nbsp;(check)</span>}</span>}
                 <span className="muted"> · {t.account_display_name ?? t.account_name}</span>
               </span>
               <span className="tx-badges">{txBadges(t)}</span>
