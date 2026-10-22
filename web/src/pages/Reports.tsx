@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Download, ArrowUpRight, ArrowDownLeft, Scale } from 'lucide-react';
+import { Download, ArrowUpRight, ArrowDownLeft, Scale, PartyPopper } from 'lucide-react';
+import { RecapStory } from '../components/recap.tsx';
 import { useApi } from '../api.ts';
 import { m } from '../i18n.ts';
 import { useCategories, useSession } from '../state.tsx';
@@ -34,6 +35,7 @@ export function Reports() {
   const [from, setFrom] = useState(`${addMonths(monthOf(today), -11)}-01`);
   const [to, setTo] = useState(today);
   const [acct, setAcct] = useState('');
+  const [recap, setRecap] = useState(false);
   const accts = useApi<Account[]>('/accounts');
   const range = preset === 'custom' ? { from, to }
     : preset === 'year' ? { from: `${today.slice(0, 4)}-01-01`, to: today }
@@ -62,8 +64,9 @@ export function Reports() {
   const header = (
     <PageHeader title={m.reports.title} subtitle="See patterns in your spending over time."
       info={<>Completed payments by booking date. Payments marked “not counted” and transfers between your own accounts are left out. Other currencies are never converted or added together.</>}
-      actions={<a className="btn" href={`/api/transactions/export.csv?from=${range.from}&to=${range.to}${acctQs}`} download><Download size={18} aria-hidden="true" />{m.tx.export}</a>} />
+      actions={<><button className="btn" onClick={() => setRecap(true)}><PartyPopper size={18} aria-hidden="true" />Last month’s recap</button><a className="btn" href={`/api/transactions/export.csv?from=${range.from}&to=${range.to}${acctQs}`} download><Download size={18} aria-hidden="true" />{m.tx.export}</a></>} />
   );
+  const recapModal = recap && <RecapStory month={addMonths(monthOf(today), -1)} onClose={() => setRecap(false)} />;
   if (r.error) return <div className="page">{header}{controls}<ErrorBox error={r.error} onRetry={() => r.reload()} /></div>;
   if (!r.data) return <div className="page">{header}{controls}<Loading rows={6} /></div>;
   const x = r.data;
@@ -80,6 +83,7 @@ export function Reports() {
 
   return (
     <div className="page">
+      {recapModal}
       {header}
       {controls}
       <p className="muted small" style={{ margin: 0 }}>{fmt.date(x.from)} – {fmt.date(x.to)}{x.totals.length > 1 ? ` · amounts in ${cur}; ${x.totals.filter((v) => v.currency !== cur).map((v) => v.currency).join(', ')} shown separately` : ''}</p>

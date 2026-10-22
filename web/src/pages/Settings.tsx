@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { SlidersHorizontal, Bell, ShieldCheck, Database, Download, Trash2, UserX, LogOut, Monitor, Sun, Moon } from 'lucide-react';
+import { SlidersHorizontal, Bell, ShieldCheck, Database, Download, Trash2, UserX, LogOut, Monitor, Sun, Moon, Type, MonitorDown } from 'lucide-react';
+import { useInstall } from '../install.ts';
 import { api, useAction, useApi } from '../api.ts';
 import { m } from '../i18n.ts';
 import { useSession, useToast } from '../state.tsx';
@@ -54,6 +55,19 @@ export function SettingsPage() {
                   ))}
                 </div>
               </fieldset>
+              <fieldset className="field" style={{ marginBottom: '1rem' }}>
+                <legend>{m.settings.textSize}</legend>
+                <div className="theme-options">
+                  {([['normal', m.settings.textNormal, 16], ['large', m.settings.textLarge, 19], ['xlarge', m.settings.textXlarge, 22]] as const).map(([v, label, px]) => (
+                    <label key={v} className="theme-option">
+                      <input type="radio" name="textsize" value={v} checked={settings.textSize === v} onChange={() => set({ textSize: v })} />
+                      <span className="theme-swatch text-sample" aria-hidden="true" style={{ fontSize: px }}><Type size={px} /> Aa</span>
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+                <small className="hint">{m.settings.textHelp}</small>
+              </fieldset>
               <div className="setting-row"><div><strong>{m.common.hideAmounts}</strong><br /><small className="muted">Useful in public places or when sharing your screen.</small></div><Switch checked={settings.hideAmounts} onChange={(v) => set({ hideAmounts: v })} label={<span className="sr-only">{m.common.hideAmounts}</span>} /></div>
               <div className="setting-row"><div><label htmlFor="s-locale"><strong>{m.settings.locale}</strong></label></div><select id="s-locale" value={settings.locale} onChange={(e) => set({ locale: e.target.value })}><option value="en-PT">English (Portugal) — 1 234,56 €</option><option value="en-GB">English (UK)</option><option value="en-US">English (US)</option><option value="pt-PT">Português (formatos)</option></select></div>
               <div className="setting-row"><div><label htmlFor="s-cur"><strong>{m.settings.currency}</strong></label><br /><small className="muted" id="s-cur-h">Totals, budgets and reports use this currency. Other currencies are shown separately, never converted.</small></div><select id="s-cur" aria-describedby="s-cur-h" value={settings.currency} onChange={(e) => set({ currency: e.target.value })}>{['EUR', 'GBP', 'USD', 'CHF', 'BRL'].map((c) => <option key={c}>{c}</option>)}</select></div>
@@ -64,6 +78,8 @@ export function SettingsPage() {
               </form>
             </Card>
           )}
+
+          {section === 'prefs' && <InstallCard />}
 
           {section === 'notify' && (
             <Card title={m.settings.notifications}>
@@ -137,5 +153,17 @@ export function SettingsPage() {
         text={<>{m.settings.deleteAccountText}{!isDemo && <Field label={m.auth.password}>{(id) => <input id={id} type="password" autoComplete="current-password" value={delPw} onChange={(e) => setDelPw(e.target.value)} />}</Field>}</>}
         onClose={() => setDelAccount(false)} onConfirm={(typed) => act.run(async () => { try { await api('/privacy/delete-account', { method: 'POST', body: { confirm: typed, password: delPw || undefined } }); await refresh(); } catch (e) { fail(e); } })} />
     </div>
+  );
+}
+
+function InstallCard() {
+  const { state, install } = useInstall();
+  return (
+    <Card title={m.settings.install} icon={<MonitorDown size={18} />}>
+      <p className="muted" style={{ marginTop: 0 }}>{m.settings.installHelp}</p>
+      {state === 'installed' ? <p><strong>{m.settings.installed}</strong></p>
+        : state === 'ready' ? <button className="btn btn-primary" onClick={install}><MonitorDown size={18} aria-hidden="true" />Install Fluxo</button>
+          : <p className="help">{m.settings.installManual}</p>}
+    </Card>
   );
 }

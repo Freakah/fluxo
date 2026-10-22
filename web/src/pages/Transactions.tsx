@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Search, Plus, Download, SlidersHorizontal, ListChecks, Hourglass, Ban, Undo2, ArrowLeftRight, ArrowDownLeft, EyeOff, PencilLine, CircleHelp, Sparkles, RotateCcw } from 'lucide-react';
+import { Search, Plus, Download, SlidersHorizontal, ListChecks, Hourglass, Ban, Undo2, ArrowLeftRight, ArrowDownLeft, EyeOff, PencilLine, CircleHelp, Sparkles, RotateCcw, HandCoins, Unlink } from 'lucide-react';
 import { api, useAction, useApi } from '../api.ts';
 import { m } from '../i18n.ts';
 import { useCategories, useSession, useToast } from '../state.tsx';
@@ -24,6 +24,7 @@ export function txBadges(t: Tx) {
       {!!t.excluded && <Badge tone="muted" icon={<EyeOff size={S} />}>Not counted</Badge>}
       {t.source === 'manual' && <Badge tone="info" icon={<PencilLine size={S} />}>{m.tx.manual}</Badge>}
       {t.needs_review && <Badge tone="warn" icon={<CircleHelp size={S} />}>{m.tx.review}</Badge>}
+      {!!t.paid_back_minor && <Badge tone="ok" icon={<HandCoins size={S} />}><Money minor={t.paid_back_minor} currency={t.currency} /> paid back</Badge>}
       {t.original_pending_amount_minor !== null && <Badge tone="muted">amount changed</Badge>}
     </>
   );
@@ -264,7 +265,7 @@ export function Transactions() {
   );
 }
 
-type Detail = Tx & { auto_source: string; auto_confidence: string; auto_category_id: number | null; category_override_id: number | null; type_override: string | null; auto_type: string; bank_code: string | null; mcc: string | null; first_seen_at: string; last_seen_at: string; rule: { pattern: string; field: string; match_type: string } | null; peer: { id: number; booking_date: string; amount_minor: number; currency: string; account_name: string } | null };
+type Detail = Tx & { auto_source: string; auto_confidence: string; auto_category_id: number | null; category_override_id: number | null; type_override: string | null; auto_type: string; bank_code: string | null; mcc: string | null; first_seen_at: string; last_seen_at: string; rule: { pattern: string; field: string; match_type: string } | null; peer: { id: number; booking_date: string; amount_minor: number; currency: string; account_name: string } | null; paidBackFor: Tx | null; paidBackBy: Tx[] };
 
 /** Grid of category tiles with icons, used instead of a long drop-down. */
 export function CategoryPicker({ categories, value, onChange, autoLabel, label }: { categories: Category[]; value: number | null; onChange: (id: number | null) => void; autoLabel?: string; label: string }) {
@@ -343,6 +344,8 @@ function TxDetail({ id, categories, onClose }: { id: number; categories: Categor
             </div>
           )}
 
+          {t.type !== 'transfer' && <SharedCost t={t} onChanged={() => onClose(true)} />}
+
           <h3 className="section-title">More options</h3>
           <Field label={m.tx.note}>{(fid) => <textarea id={fid} maxLength={500} rows={2} placeholder={m.tx.notePlaceholder} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />}</Field>
           <Field label={m.tx.typeOverride}>{(fid) => (
@@ -401,6 +404,68 @@ function CashEntry({ open, categories, onClose }: { open: boolean; categories: C
       <h3 className="section-title">{m.tx.category}</h3>
       <CategoryPicker label={m.tx.category} categories={categories.filter((c) => c.key !== 'income')} value={f.categoryId} onChange={(v) => setF({ ...f, categoryId: v })} autoLabel="Automatic" />
       <button type="button" className="link small" onClick={() => setF({ date: today, amount: '', description: '', categoryId: null })} style={{ alignSelf: 'flex-start' }}><RotateCcw size={14} aria-hidden="true" /> Clear</button>
+    </Modal>
+  );
+}
+
+/** "Paid back" section of the detail panel: shows links and lets the user add or remove one. */
+function SharedCost({ t, onChanged }: { t: Detail; onChanged: () => void }) {
+  const { fmt } = useSession();
+  const toast = useToast();
+  const [picking, setPicking] = useState(false);
+  const unlink = (expenseId: number, incomingId: number) => api('/paid-back', { method: 'PUT', body: { expenseId, incomingId, linked: false } })
+    .then(() => { toast('Link removed'); onChanged(); }).catch((e: Error) => toast(e.message, { kind: 'error' }));
+  const share = t.amount_minor + (t.paid_back_minor ?? 0);
+  return (
+    <>
+      <h3 className="section-title">{m.paidBack.title}</h3>
+      {t.paidBackFor ? (
+        <div className="explain"><HandCoins size={16} aria-hidden="true" /><span>This money paid back <strong>{t.paidBackFor.merchant}</strong> on {fmt.date(t.paidBackFor.booking_date)} (<Money minor={t.paidBackFor.amount_minor} currency={t.currency} />). It lowers that spending instead of counting as income.
+          {' '}<button className="link" onClick={() => unlink(t.paidBackFor!.id, t.id)}><Unlink size={14} aria-hidden="true" /> Remove link</button></span></div>
+      ) : t.paidBackBy.length ? (
+        <div className="stack" style={{ gap: '.4rem' }}>
+          <div className="explain"><HandCoins size={16} aria-hidden="true" /><span>You paid <Money minor={-t.amount_minor} currency={t.currency} />, got <Money minor={t.paid_back_minor ?? 0} currency={t.currency} /> back. <strong>Your share: <Money minor={-share} currency={t.currency} /></strong></span></div>
+          {t.paidBackBy.map((p) => <div key={p.id} className="row small"><span>{p.merchant}, {fmt.date(p.booking_date)}: <Money minor={p.amount_minor} currency={p.currency} sign="always" /></span><button className="link" onClick={() => unlink(t.id, p.id)}><Unlink size={14} aria-hidden="true" /> Remove</button></div>)}
+          {share < 0 && <button className="link" style={{ alignSelf: 'flex-start' }} onClick={() => setPicking(true)}>Add another payment back</button>}
+        </div>
+      ) : (
+        <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setPicking(true)}><HandCoins size={18} aria-hidden="true" />{t.amount_minor > 0 ? m.paidBack.thisPaidBack : m.paidBack.someonePaid}</button>
+      )}
+      {picking && <PaidBackPicker tx={t} onClose={(changed) => { setPicking(false); if (changed) onChanged(); }} />}
+    </>
+  );
+}
+
+/** Pick the other side of a paid-back pair. Incoming money -> an earlier expense; an expense -> money received later. */
+export function PaidBackPicker({ tx: t, onClose }: { tx: Tx; onClose: (changed: boolean) => void }) {
+  const { fmt } = useSession();
+  const toast = useToast();
+  const incoming = t.amount_minor > 0;
+  const c = useApi<Tx[]>(`/transactions/${t.id}/payback-candidates`);
+  const [pick, setPick] = useState<number | null>(null);
+  const { busy, run } = useAction();
+  const save = () => pick && run(async () => {
+    try {
+      await api('/paid-back', { method: 'PUT', body: incoming ? { expenseId: pick, incomingId: t.id, linked: true } : { expenseId: t.id, incomingId: pick, linked: true } });
+      toast('Linked. Only your share counts as spending now.');
+      onClose(true);
+    } catch (e) { toast((e as Error).message, { kind: 'error' }); }
+  });
+  return (
+    <Modal open title={incoming ? m.paidBack.thisPaidBack : m.paidBack.someonePaid} onClose={() => onClose(false)} footer={<><button className="btn" onClick={() => onClose(false)}>{m.common.cancel}</button><button className="btn btn-primary" disabled={!pick || busy} onClick={save}>{m.paidBack.link}</button></>}>
+      <p className="help" style={{ marginTop: 0 }}>{incoming ? m.paidBack.pickExpense : m.paidBack.pickIncoming}</p>
+      {c.error && <ErrorBox error={c.error} />}
+      {!c.data ? <Loading /> : !c.data.length ? <Empty art="search" title={m.paidBack.none} /> : (
+        <div className="pick-list" role="radiogroup" aria-label={incoming ? 'Payments you made' : 'Money you received'}>
+          {c.data.map((x) => (
+            <button key={x.id} type="button" role="radio" aria-checked={pick === x.id} className="pick-item" onClick={() => setPick(x.id)}>
+              <span className="pick-dot" aria-hidden="true" />
+              <span className="item-text"><strong>{x.merchant}</strong><small className="muted">{fmt.date(x.booking_date)}{x.category_name ? ` · ${x.category_name}` : ''}</small></span>
+              <Money minor={x.amount_minor} currency={x.currency} sign="always" />
+            </button>
+          ))}
+        </div>
+      )}
     </Modal>
   );
 }

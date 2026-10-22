@@ -13,6 +13,8 @@ export function makeFormat(s: Settings) {
     currencySymbol: (currency = s.currency) => new Intl.NumberFormat(s.locale, { style: 'currency', currency }).formatToParts(0).find((p) => p.type === 'currency')?.value ?? currency,
     money: (minor: number | null | undefined, currency = s.currency, sign: 'auto' | 'always' | 'exceptZero' = 'auto') =>
       minor === null || minor === undefined ? '—' : s.hideAmounts ? '•••••' : formatMoney(minor, currency, s.locale, { signDisplay: sign }),
+    /** Short label for chart axes, e.g. €1.6K. */
+    compact: (minor: number, currency = s.currency) => s.hideAmounts ? '•••' : new Intl.NumberFormat(s.locale, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(minor / 100),
     date: (d: string | null | undefined) => (d ? dateFmt.format(asUtc(d)) : '—'),
     shortDate: (d: string) => shortDate.format(asUtc(d)),
     month: (m: string) => monthFmt.format(asUtc(`${m}-01`)),

@@ -3,11 +3,12 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { all, get, run, nowIso } from '../db/db.ts';
 import { body, HttpError, uid, type Deps, type Env } from '../context.ts';
-import { totals, spendingByCategory, spendingByDay, byMonth, spendingByMerchant } from '../domain/aggregate.ts';
+import { EFF_TYPE, totals, spendingByCategory, spendingByDay, byMonth, spendingByMerchant } from '../domain/aggregate.ts';
 import { budgetStatus, budgetsFor, setBudget } from '../domain/budgets.ts';
 import { monthlyEquivalent, type Frequency } from '../domain/recurring.ts';
 import { checkBudgetAlerts, userSettings } from '../domain/notifications.ts';
 import { TX_SELECT } from '../domain/txquery.ts';
+import { hints, recap, balanceHistory } from '../domain/highlights.ts';
 import { addDays, addMonths, isDate, isMonth, monthBounds, monthOf, todayIn, daysBetween } from '../../shared/dates.ts';
 import { mergeSettings } from '../../shared/settings.ts';
 import { parseAmountToMinor } from '../../shared/money.ts';
@@ -62,6 +63,9 @@ export function insightRoutes(deps: Deps) {
       recent: all(db, `${TX_SELECT} WHERE t.user_id = ? ${accountIds ? `AND t.account_id IN (${accountIds.map(() => '?').join(',')})` : ''} ORDER BY t.booking_date DESC, t.id DESC LIMIT 8`, userId, ...(accountIds ?? [])),
       upcoming,
       sync: { lastSuccess: conns.map((x) => x.last_success_at).filter(Boolean).sort().pop() ?? null, connections: conns.length, problems },
+      hints: hints(db, userId, today, s.currency),
+      balanceHistory: balanceHistory(db, userId, today, s.currency, accountIds),
+      toReview: get<{ n: number }>(db, `SELECT COUNT(*) n FROM transactions t WHERE t.user_id = ? AND t.reviewed_at IS NULL AND t.excluded = 0 AND t.status <> 'cancelled' AND ${EFF_TYPE} <> 'transfer' AND t.booking_date >= ?`, userId, addDays(today, -30))!.n,
       unreadNotifications: get<{ n: number }>(db, 'SELECT COUNT(*) n FROM notifications WHERE user_id = ? AND read_at IS NULL', userId)!.n,
     });
   });
@@ -156,6 +160,15 @@ export function insightRoutes(deps: Deps) {
     });
   });
 
+  // ---- Monthly recap (defaults to last month)
+  app.get('/recap', (c) => {
+    const userId = uid(c);
+    const s = userSettings(db, userId);
+    const month = c.req.query('month') ?? addMonths(monthOf(todayIn(s.timezone)), -1);
+    if (!isMonth(month)) throw new HttpError(400, 'month must be YYYY-MM');
+    return c.json(recap(db, userId, month, s.currency, s.budgetThresholds));
+  });
+
   // ---- Notifications
   app.get('/notifications', (c) => c.json(all(db, 'SELECT id, kind, title, body, link, severity, created_at, read_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 100', uid(c))));
   app.post('/notifications/:id/read', (c) => { run(db, 'UPDATE notifications SET read_at = COALESCE(read_at, ?) WHERE id = ? AND user_id = ?', nowIso(), Number(c.req.param('id')), uid(c)); return c.json({ ok: true }); });
@@ -172,6 +185,8 @@ export function insightRoutes(deps: Deps) {
     budgetThresholds: z.array(z.number().int().min(1).max(200)).min(1).max(4).optional(),
     notify: z.object({ budget: z.boolean(), sync: z.boolean(), consent: z.boolean(), recurring: z.boolean() }).partial().optional(),
     onboarded: z.boolean().optional(),
+    recapSeen: z.string().refine(isMonth).nullable().optional(),
+    textSize: z.enum(['normal', 'large', 'xlarge']).optional(),
   }).strict();
   app.put('/me/settings', async (c) => {
     const b = await body(c, settingsSchema);

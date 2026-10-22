@@ -13,7 +13,7 @@ test('screenshots', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await demo(page);
   await page.screenshot({ path: 'docs/screenshots/dashboard.png' });
-  for (const [path, file] of [['/transactions', 'transactions'], ['/budgets', 'budgets'], ['/recurring', 'recurring'], ['/reports', 'reports'], ['/accounts', 'accounts']] as const) {
+  for (const [path, file] of [['/transactions', 'transactions'], ['/budgets', 'budgets'], ['/recurring', 'recurring'], ['/reports', 'reports'], ['/accounts', 'accounts'], ['/review', 'review']] as const) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
     await page.screenshot({ path: `docs/screenshots/${file}.png` });

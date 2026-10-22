@@ -111,6 +111,7 @@ export function CumulativeChart({ current, previous, days, currency }: { current
         onMouseLeave={() => setHover(null)}
         onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const i = Math.round(((e.clientX - r.left) / r.width * W - PAD.l) / (W - PAD.l - PAD.r) * (n - 1)); setHover(Math.max(0, Math.min(current.length - 1, i))); }}>
         {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} className="grid" x1={PAD.l} x2={W - PAD.r} y1={y(max * f)} y2={y(max * f)} />)}
+        {[0.5, 1].map((f) => <text key={f} className="tick" x={W - PAD.r} y={y(max * f) - 4} textAnchor="end">{fmt.compact(max * f, currency)}</text>)}
         {current.length > 1 && <path d={`${path(current)} L${x(current.length - 1)},${H - PAD.b} L${x(0)},${H - PAD.b} Z`} className="area-1" />}
         <path d={path(previous)} className="line line-prev" />
         <path d={path(current)} className="line line-1" />
@@ -143,6 +144,7 @@ export function MonthBars({ months, a, b, labels, currency, budgets, onSelect }:
       {n > 0 && <p className="chart-readout">{fmt.month(months[hi])}: <strong>{fmt.money(a[hi], currency)}</strong> {labels[0].toLowerCase()}{b && <> · <strong>{fmt.money(b[hi], currency)}</strong> {labels[1]?.toLowerCase()}</>}{budgets?.[hi] != null && <> · {m.reports.budget.toLowerCase()} {fmt.money(budgets[hi], currency)}</>}</p>}
       <svg viewBox={`0 0 ${W} ${H}`} className="svg-chart" role="img" aria-label="Bar chart by month; use the table view for values" onMouseLeave={() => setHover(null)}>
         {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} className="grid" x1={PAD.l} x2={W - PAD.r} y1={y(max * f)} y2={y(max * f)} />)}
+        {[0.5, 1].map((f) => <text key={f} className="tick" x={W - PAD.r} y={y(max * f) - 4} textAnchor="end">{fmt.compact(max * f, currency)}</text>)}
         {months.map((mo, i) => {
           const cx = PAD.l + slot * i + slot / 2;
           const x0 = b ? cx - bw - 1 : cx - bw / 2;
@@ -157,6 +159,36 @@ export function MonthBars({ months, a, b, labels, currency, budgets, onSelect }:
           );
         })}
         <line className="axis" x1={PAD.l} x2={W - PAD.r} y1={H - PAD.b} y2={H - PAD.b} />
+      </svg>
+    </ChartFrame>
+  );
+}
+
+/** Balance over time (worked back from the bank balance), as a soft area line. */
+export function BalanceChart({ points, currency }: { points: { date: string; balance: number }[]; currency: string }) {
+  const { fmt } = useSession();
+  const [hover, setHover] = useState<number | null>(null);
+  const h = 120, n = points.length;
+  const vals = points.map((p) => p.balance);
+  const lo = Math.min(...vals), hiV = Math.max(...vals), span = Math.max(1, hiV - lo);
+  const x = (i: number) => PAD.l + (i / Math.max(1, n - 1)) * (W - PAD.l - PAD.r);
+  const y = (v: number) => h - 8 - ((v - lo) / span) * (h - 24);
+  const d = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const i = hover ?? n - 1;
+  const table = (
+    <table className="table"><caption className="sr-only">Balance by day</caption>
+      <thead><tr><th scope="col">Date</th><th scope="col" className="num">Balance</th></tr></thead>
+      <tbody>{points.filter((_, k) => k % 7 === (n - 1) % 7).map((p) => <tr key={p.date}><th scope="row">{fmt.date(p.date)}</th><td className="num">{fmt.money(p.balance, currency)}</td></tr>)}</tbody>
+    </table>
+  );
+  return (
+    <ChartFrame caption="Balance over the last 90 days" table={table}>
+      <p className="chart-readout">{fmt.shortDate(points[i].date)}: <strong>{fmt.money(points[i].balance, currency)}</strong></p>
+      <svg viewBox={`0 0 ${W} ${h}`} className="svg-chart" role="img" aria-label="Line chart of your balance; use the table view for values" onMouseLeave={() => setHover(null)}
+        onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHover(Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) / r.width * W - PAD.l) / (W - PAD.l - PAD.r) * (n - 1))))); }}>
+        <path d={`${d} L${x(n - 1)},${h} L${x(0)},${h} Z`} className="area-1" />
+        <path d={d} className="line line-1" />
+        <circle className="marker" cx={x(i)} cy={y(vals[i])} r={5} />
       </svg>
     </ChartFrame>
   );

@@ -74,6 +74,8 @@ export async function seedDemoData(db: DB, key: Buffer, userId: number, today: s
   const sumup = get<{ id: number }>(db, "SELECT id FROM transactions WHERE user_id = ? AND description LIKE '%TASCA DO ZE%' ORDER BY booking_date DESC LIMIT 1", userId);
   if (sumup) run(db, "UPDATE transactions SET category_override_id = ?, note = 'Lunch with the team' WHERE id = ?", cat('restaurants'), sumup.id);
   run(db, "UPDATE recurring SET status = 'confirmed' WHERE user_id = ? AND merchant IN ('Netflix', 'Spotify', 'MEO')", userId);
+  // Only the last week waits in the review inbox, as for someone who checks in regularly.
+  run(db, 'UPDATE transactions SET reviewed_at = ? WHERE user_id = ? AND booking_date < ?', nowIso(), userId, addDays(today, -7));
   checkBudgetAlerts(db, userId, at(today));
 }
 

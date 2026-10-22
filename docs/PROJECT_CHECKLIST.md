@@ -43,8 +43,13 @@ original task; this file tracks status.
 ## Redesign (2026-10-22)
 - [x] Design system (Inter, Lucide icons, tokens, light/dark), grouped navigation, mobile bottom bar, welcome + tour, Ctrl+K palette, illustrations, redesigned pages, lazy-loaded secondary pages (main bundle ~320 kB). 18 e2e tests (desktop + mobile, axe) pass.
 
+## Everyday-use features (2026-10-22)
+- [x] Review inbox, “paid back” links, unusual-spending and price-rise hints, monthly recap, balance chart, text size setting, installable app (manifest + static-only service worker), phone bottom sheet, pinned day headers, smaller cents.
+- [ ] Not done on purpose: swipe gestures on Activity rows and pull-to-refresh (hidden gestures are hard to discover for less confident users; swipe exists only on the review card, with buttons too), per-category sparklines on Home (clutter).
+- [ ] Installing on a phone needs HTTPS (service workers require a secure context); on the computer itself (localhost) it works in Chrome/Edge.
+
 ## Remaining / future work
-- Portuguese translation file (`web/src/i18n.ts` structure ready)
+- Portuguese interface: `web/src/i18n.ts` holds part of the copy; many page strings are still inline and need moving there first
 - Email/push notifications (optional), QR code for TOTP setup
 - Savings goals, household sharing, receipt OCR, forecasting, AI classification (out of scope)
 

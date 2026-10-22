@@ -306,3 +306,53 @@ describe('demo mode', () => {
     expect(get<{ n: number }>(db, 'SELECT COUNT(*) n FROM transactions')!.n).toBe(n1 * 2);
   });
 });
+
+describe('review inbox, paid back and highlights', () => {
+  it('queues recent payments, links a friend paying back, and explains the month', async () => {
+    const { app } = testApp({ mode: 'demo' });
+    const c = client(app);
+    await c.post('/api/auth/demo');
+    const dash = (await c.get('/api/dashboard')).json;
+    expect(dash.toReview).toBeGreaterThan(0);
+    const queue = (await c.get('/api/review')).json;
+    expect(queue.total).toBe(dash.toReview);
+    expect(queue.rows.every((r: { type: string }) => r.type !== 'transfer')).toBe(true);
+    await c.post('/api/review/done', { ids: [queue.rows[0].id] });
+    expect((await c.get('/api/review')).json.total).toBe(queue.total - 1);
+
+    // Paid back: the friend's MB WAY becomes a refund in the dinner's category.
+    const find = async (q: string) => (await c.get(`/api/transactions?q=${encodeURIComponent(q)}`)).json.rows[0];
+    const dinner = (await c.get('/api/transactions?q=RAMIRO&limit=200')).json.rows.find((r: { amount_minor: number }) => r.amount_minor === -6400);
+    const friend = await find('961***204');
+    const cands = (await c.get(`/api/transactions/${friend.id}/payback-candidates`)).json;
+    expect(cands[0].id).toBe(dinner.id); // exactly double the friend's payment ranks first
+    const spendBefore = (await c.get('/api/dashboard')).json.totals[0].spending;
+    expect((await c.put('/api/paid-back', { expenseId: dinner.id, incomingId: friend.id, linked: true })).status).toBe(200);
+    const linked = (await c.get(`/api/transactions/${dinner.id}`)).json;
+    expect(linked.paid_back_minor).toBe(3200);
+    expect(linked.paidBackBy.map((r: { id: number }) => r.id)).toEqual([friend.id]);
+    const after = (await c.get(`/api/transactions/${friend.id}`)).json;
+    expect(after).toMatchObject({ type: 'refund', category_id: dinner.category_id, paidBackFor: { id: dinner.id } });
+    const sameMonth = dinner.booking_date.slice(0, 7) === friend.booking_date.slice(0, 7) && friend.booking_date.slice(0, 7) === today.slice(0, 7);
+    if (sameMonth) expect((await c.get('/api/dashboard')).json.totals[0].spending).toBe(spendBefore - 3200);
+    const utilities = (await c.get('/api/categories')).json.find((x: { key: string }) => x.key === 'utilities').id;
+    await c.patch(`/api/transactions/${dinner.id}`, { categoryId: utilities });
+    expect((await c.get(`/api/transactions/${friend.id}`)).json.category_id).toBe(utilities); // follows the expense
+    expect((await c.put('/api/paid-back', { expenseId: dinner.id, incomingId: dinner.id, linked: true })).status).toBe(400);
+    await c.put('/api/paid-back', { expenseId: dinner.id, incomingId: friend.id, linked: false });
+    expect((await c.get(`/api/transactions/${friend.id}`)).json).toMatchObject({ type: 'income', paidBackFor: null });
+
+    // Highlights: the demo Spotify price rise, a recap of last month and a balance line.
+    const d2 = (await c.get('/api/dashboard')).json;
+    expect(d2.hints).toContainEqual({ kind: 'price_up', merchant: 'Spotify', from: 799, to: 899, currency: 'EUR' });
+    expect(d2.balanceHistory).toHaveLength(91);
+    expect(d2.balanceHistory.at(-1).balance).toBe(d2.balances.filter((b: { kind: string; included: number }) => ['current', 'savings'].includes(b.kind) && b.included).reduce((a: number, b: { balance_minor: number }) => a + b.balance_minor, 0));
+    const r = (await c.get('/api/recap')).json;
+    expect(r.spending).toBeGreaterThan(0);
+    expect(r.topMerchant.spending).toBeGreaterThan(0);
+    expect(r.budgets.total).toBeGreaterThan(0);
+    expect((await c.get('/api/recap?month=2026-13')).status).toBe(400);
+    expect((await c.put('/api/me/settings', { recapSeen: '2026-09', textSize: 'large' })).json).toMatchObject({ recapSeen: '2026-09', textSize: 'large' });
+    expect((await c.put('/api/me/settings', { textSize: 'huge' })).status).toBe(400);
+  });
+});

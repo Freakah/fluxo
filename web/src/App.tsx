@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from
 import { createBrowserRouter, RouterProvider, NavLink, Link, Outlet, useLocation, useNavigate, Navigate } from 'react-router';
 import {
   House, ListOrdered, Target, CalendarClock, ChartPie, Landmark, Tags, Settings as SettingsIcon, CircleHelp, Bell, Eye, EyeOff,
-  Search, Menu, LogOut, Ellipsis, CircleCheck, TriangleAlert, Compass, FlaskConical,
+  Search, Menu, LogOut, Ellipsis, CircleCheck, TriangleAlert, Compass, FlaskConical, Inbox,
 } from 'lucide-react';
 import { CategoriesProvider, SessionProvider, ToastProvider, useSession, useToast } from './state.tsx';
 import { api, useApi } from './api.ts';
@@ -19,14 +19,17 @@ const Accounts = lazy(() => import('./pages/Accounts.tsx').then((x) => ({ defaul
 const Categories = lazy(() => import('./pages/Categories.tsx').then((x) => ({ default: x.Categories })));
 const SettingsPage = lazy(() => import('./pages/Settings.tsx').then((x) => ({ default: x.SettingsPage })));
 const Notifications = lazy(() => import('./pages/Notifications.tsx').then((x) => ({ default: x.Notifications })));
+const Review = lazy(() => import('./pages/Review.tsx').then((x) => ({ default: x.Review })));
 const Help = lazy(() => import('./pages/Help.tsx').then((x) => ({ default: x.Help })));
 import { DemoBank } from './pages/DemoBank.tsx';
 import type { Connection, Notification } from './types.ts';
 
-type NavItem = { to: string; label: string; icon: ReactNode; tour: string };
+type NavItem = { to: string; label: string; icon: ReactNode; tour: string; badge?: number };
 const I = 20;
 const HOME: NavItem = { to: '/', label: m.nav.dashboard, icon: <House size={I} />, tour: 'nav-home' };
+const REVIEW: NavItem = { to: '/review', label: m.nav.review, icon: <Inbox size={I} />, tour: 'nav-review' };
 const MONEY: NavItem[] = [
+  REVIEW,
   { to: '/transactions', label: m.nav.transactions, icon: <ListOrdered size={I} />, tour: 'nav-activity' },
   { to: '/budgets', label: m.nav.budgets, icon: <Target size={I} />, tour: 'nav-budgets' },
   { to: '/recurring', label: m.nav.recurring, icon: <CalendarClock size={I} />, tour: 'nav-bills' },
@@ -124,6 +127,9 @@ function Shell() {
   const authed = !!session?.user;
   const notes = useApi<Notification[]>(authed ? `/notifications?_=${loc.pathname}` : null);
   const conns = useApi<Connection[]>(authed ? `/connections?_=${loc.pathname}` : null);
+  const review = useApi<{ total: number }>(authed ? `/review/count?_=${loc.pathname}` : null);
+  const reloadReview = review.reload;
+  useEffect(() => { const h = () => void reloadReview(true); addEventListener('fluxo:review', h); return () => removeEventListener('fluxo:review', h); }, [reloadReview]);
   useEffect(() => { setMenuOpen(false); document.getElementById('main')?.focus({ preventScroll: true }); window.scrollTo(0, 0); }, [loc.pathname]);
   useEffect(() => {
     const onScroll = () => setScrolled(scrollY > 4);
@@ -155,7 +161,7 @@ function Shell() {
   };
   const togglePrivacy = () => updateSettings({ hideAmounts: !settings.hideAmounts }).catch((e) => toast((e as Error).message, { kind: 'error' }));
   const link = (n: NavItem) => (
-    <li key={n.to}><NavLink to={n.to} end={n.to === '/'} data-tour={n.tour}><span aria-hidden="true" className="nav-icon">{n.icon}</span>{n.label}</NavLink></li>
+    <li key={n.to}><NavLink to={n.to} end={n.to === '/'} data-tour={n.tour}><span aria-hidden="true" className="nav-icon">{n.icon}</span>{n.label}{n === REVIEW && !!review.data?.total && <span className="nav-badge"><span className="sr-only">, </span>{review.data.total}<span className="sr-only"> waiting</span></span>}</NavLink></li>
   );
 
   return (
@@ -194,7 +200,7 @@ function Shell() {
         </div>
       </div>
       <nav className="bottom-nav" aria-label="Quick">
-        {[HOME, MONEY[0], MONEY[1], MONEY[3]].map((n) => <NavLink key={n.to} to={n.to} end={n.to === '/'} data-tour={n.tour}><span aria-hidden="true">{n.icon}</span>{n.label}</NavLink>)}
+        {[HOME, REVIEW, MONEY[1], MONEY[4]].map((n) => <NavLink key={n.to} to={n.to} end={n.to === '/'} data-tour={n.tour}><span aria-hidden="true">{n.icon}</span>{n.label}</NavLink>)}
         <button onClick={() => setMenuOpen(true)} aria-controls="sidenav" aria-expanded={menuOpen}><span aria-hidden="true"><Ellipsis size={20} /></span>{m.nav.more}</button>
       </nav>
       <CommandPalette open={palette} onClose={() => setPalette(false)} pages={ALL} onTour={() => setTour(true)} />
@@ -217,6 +223,7 @@ const router = createBrowserRouter([
       { path: '/categories', element: <Categories /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/notifications', element: <Notifications /> },
+      { path: '/review', element: <Review /> },
       { path: '/help', element: <Help /> },
       { path: '/demo-bank', element: null },
       { path: '*', element: <Navigate to="/" replace /> },

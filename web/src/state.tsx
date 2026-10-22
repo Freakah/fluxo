@@ -28,6 +28,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     if (settings.theme === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', settings.theme);
   }, [settings.theme]);
+  useEffect(() => { document.documentElement.dataset.textSize = settings.textSize; }, [settings.textSize]);
   const updateSettings = useCallback(async (p: Partial<Settings>) => {
     const next = await api<Settings>('/me/settings', { method: 'PUT', body: p });
     setSession((s) => (s && s.user ? { ...s, user: { ...s.user, settings: next } } : s));

@@ -14,8 +14,10 @@ defaults (all configurable).
 | Activity | Budgets | Bills |
 |---|---|---|
 | ![Transactions](docs/screenshots/transactions.png) | ![Budgets](docs/screenshots/budgets.png) | ![Bills](docs/screenshots/recurring.png) |
-| **Insights** | **Banks** | **Mobile** |
-| ![Insights](docs/screenshots/reports.png) | ![Banks](docs/screenshots/accounts.png) | ![Mobile](docs/screenshots/mobile-transactions.png) |
+| **Insights** | **Banks** | **To review** |
+| ![Insights](docs/screenshots/reports.png) | ![Banks](docs/screenshots/accounts.png) | ![To review](docs/screenshots/review.png) |
+| **Phone** | | |
+| ![Phone](docs/screenshots/mobile-transactions.png) | | |
 
 All screenshots use synthetic demo data.
 
@@ -25,7 +27,11 @@ All screenshots use synthetic demo data.
 - **Reliable imports**: full initial pagination, overlapping incremental windows, idempotent writes, pending→posted reconciliation, identical purchases kept separate, never deletes posted history. See [docs/SYNC.md](docs/SYNC.md).
 - **Friendly, guided interface**: a first-run welcome, an optional guided tour, plain-language labels with ⓘ explanations, category icons, illustrations, Ctrl+K quick search, and a phone layout with a bottom tab bar.
 - **Home**: what you spent this month (compared with last month), budget left per day, money in, bills coming up, and an interactive “where it went” chart you can click into.
-- **Activity**: grouped by day; search, quick filter chips (account, dates, category, type, status, amount), sorting, detail view showing bank facts vs. your own labels, notes, bulk edits, exclusion from reports, undo.
+- **To review**: new payments wait in a short queue; confirm each category with one tap (or swipe on a phone), change it, or mark them all as checked.
+- **Paid back**: link a friend’s MB WAY or transfer to the dinner it paid for, so only your share counts as spending.
+- **Gentle hints and a monthly recap**: one-line notes such as “Spotify went up from €7.99 to €8.99” or a category well above its usual month, and a five-card look back at last month. Computed locally; nothing is sent to AI services.
+- **Easy to read**: text size setting (Normal / Large / Extra large), balance-over-time chart, details open as a bottom sheet on phones, and Fluxo can be installed as an app (its own window and icon).
+- **Activity**: grouped by day (day headers stay visible while you scroll); search, quick filter chips (account, dates, category, type, status, amount), sorting, detail view showing bank facts vs. your own labels, notes, bulk edits, exclusion from reports, undo.
 - **Categorization without AI services**: your corrections → your rules → known merchants / card codes → description keywords → Uncategorized. Every category shows *why* and *how confident*. Rule preview before applying to history.
 - **Budgets**: monthly total + category limits with progress rings, a step-by-step setup that suggests amounts from your last 3 months, 80 %/100 % alerts (configurable), previous-month comparison.
 - **Bills and subscriptions**: a calendar of expected payments; weekly/monthly/quarterly/yearly detection, subscriptions vs. bills, variable bills, monthly equivalents — always labelled as estimates.

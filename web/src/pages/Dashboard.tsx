@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { RecapStory } from '../components/recap.tsx';
 import { Link, useNavigate } from 'react-router';
-import { ArrowDownLeft, Scale, CalendarClock, TrendingDown, TrendingUp, TriangleAlert, ChevronRight, Hourglass, Wallet } from 'lucide-react';
+import { ArrowDownLeft, Scale, CalendarClock, TrendingDown, TrendingUp, TriangleAlert, ChevronRight, Hourglass, Wallet, Inbox, Lightbulb, PartyPopper } from 'lucide-react';
 import { useApi } from '../api.ts';
 import { m } from '../i18n.ts';
 import { useCategories, useSession } from '../state.tsx';
 import { Card, ErrorBox, Loading, Money, Empty, CountUp, Info, Progress, stateBadge } from '../components/ui.tsx';
-import { Donut, CumulativeChart } from '../components/charts.tsx';
+import { Donut, CumulativeChart, BalanceChart } from '../components/charts.tsx';
+import { addMonths } from '../../../shared/dates.ts';
 import { CatIcon, Monogram } from '../components/icons.tsx';
 import { TxList } from './Transactions.tsx';
 import type { Account, BudgetLine, Totals, Tx } from '../types.ts';
@@ -17,7 +19,9 @@ type Dash = {
   trend: { days: number; dayOfMonth: number; current: number[]; previous: number[] };
   recent: Tx[]; upcoming: { id: number; merchant: string; kind: string; frequency: string; typical_amount_minor: number; user_amount_minor: number | null; currency: string; next_date: string; status: string }[];
   sync: { lastSuccess: string | null; connections: number; problems: { id: number; institution: string; status: string; message: string | null }[] };
+  hints: Hint[]; balanceHistory: { date: string; balance: number }[] | null; toReview: number;
 };
+type Hint = { kind: 'category_up'; categoryId: number | null; current: number; usual: number; pct: number } | { kind: 'price_up'; merchant: string; from: number; to: number; currency: string };
 
 function greeting(tz: string) {
   const h = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: tz }).format(new Date()));
@@ -25,8 +29,9 @@ function greeting(tz: string) {
 }
 
 export function Dashboard() {
-  const { fmt, settings } = useSession();
+  const { fmt, settings, updateSettings } = useSession();
   const { byId } = useCategories();
+  const [recap, setRecap] = useState(false);
   const nav = useNavigate();
   const accts = useApi<Account[]>('/accounts');
   const [scope, setScope] = useState('');
@@ -46,6 +51,12 @@ export function Dashboard() {
   const upcomingTotal = x.upcoming.filter((u) => u.currency === x.currency).reduce((a, u) => a + (u.user_amount_minor ?? u.typical_amount_minor), 0);
   const selected = cats.find((c) => (c.categoryId ?? 'none') === cat);
   const noAccounts = x.sync.connections === 0 && (accts.data?.length ?? 0) === 0;
+  const lastMonth = addMonths(x.month, -1);
+  // The recap card shows during the first 10 days of a month until opened or dismissed.
+  const showRecap = x.trend.dayOfMonth <= 10 && settings.recapSeen !== lastMonth && x.trend.previous.at(-1)! > 0;
+  const hintText = (h: Hint) => h.kind === 'category_up'
+    ? <><strong>{h.categoryId ? byId.get(h.categoryId)?.name ?? 'A category' : 'Uncategorized'}</strong>: {h.pct < 100 ? `${h.pct}% more than usual` : `about ${Math.round((h.current / h.usual) * 10) / 10} times the usual`} this month. <Money minor={h.current} currency={x.currency} /> so far, usually about <Money minor={h.usual} currency={x.currency} /> a month.</>
+    : <><strong>{h.merchant}</strong> went up from <Money minor={h.from} currency={h.currency} /> to <Money minor={h.to} currency={h.currency} />.</>;
 
   return (
     <div className="page">
@@ -76,6 +87,22 @@ export function Dashboard() {
           ))}
         </section>
       )}
+
+      {!noAccounts && x.toReview > 0 && (
+        <section className="card nudge" aria-labelledby="nudge-review">
+          <span className="stat-icon accent"><Inbox size={22} aria-hidden="true" /></span>
+          <div><h2 id="nudge-review">{x.toReview} {m.review.homeTitle}</h2><p className="muted small">{m.review.homeText}</p></div>
+          <Link className="btn btn-primary" to="/review">{m.review.homeButton}</Link>
+        </section>
+      )}
+      {!noAccounts && showRecap && (
+        <section className="card nudge recap-nudge" aria-labelledby="nudge-recap">
+          <span className="stat-icon warn"><PartyPopper size={22} aria-hidden="true" /></span>
+          <div><h2 id="nudge-recap">{m.recap.cardTitle.replace('{month}', fmt.month(lastMonth).split(' ')[0])}</h2><p className="muted small">{m.recap.cardText}</p></div>
+          <div className="row"><button className="btn" onClick={() => updateSettings({ recapSeen: lastMonth })}>{m.recap.later}</button><button className="btn btn-primary" onClick={() => setRecap(true)}>{m.recap.open}</button></div>
+        </section>
+      )}
+      {recap && <RecapStory month={lastMonth} onClose={() => { setRecap(false); void updateSettings({ recapSeen: lastMonth }).catch(() => undefined); }} />}
 
       {noAccounts ? (
         <Card><Empty art="bank" title={m.dashboard.empty} action={<Link className="btn btn-primary" to="/accounts?connect=1">{m.dashboard.connect}</Link>}>{m.dashboard.emptyHelp}</Empty></Card>
@@ -121,6 +148,15 @@ export function Dashboard() {
             <div className="stat"><span className={`stat-icon ${main.net < 0 ? 'bad' : 'accent'}`}><Scale size={22} aria-hidden="true" /></span><div><div className="stat-label">{m.dashboard.net}<Info label="What is left over?">{m.dashboard.netHelp}</Info></div><div className={`stat-value ${main.net < 0 ? 'neg' : ''}`}><Money minor={main.net} currency={x.currency} sign="exceptZero" /></div></div></div>
             <Link to="/recurring" className="stat"><span className="stat-icon warn"><CalendarClock size={22} aria-hidden="true" /></span><div><div className="stat-label">Bills in the next 30 days</div><div className="stat-value">~<Money minor={upcomingTotal} currency={x.currency} /></div></div></Link>
           </div>
+          {x.hints.length > 0 && (
+            <section className="hints" aria-label="Worth knowing">
+              {x.hints.map((h, k) => (
+                <Link key={k} className="hint-row" to={h.kind === 'category_up' ? `/transactions?category=${h.categoryId ?? 'none'}&from=${x.month}-01&to=${x.today}` : `/transactions?q=${encodeURIComponent(h.merchant)}`}>
+                  <span className="hint-icon" aria-hidden="true"><Lightbulb size={18} /></span><span>{hintText(h)}</span><ChevronRight size={18} aria-hidden="true" className="muted" />
+                </Link>
+              ))}
+            </section>
+          )}
           {others.length > 0 && <p className="help">{m.dashboard.otherCurrencies} {others.map((o) => <span key={o.currency} className="chip">{o.currency}: <Money minor={o.spending} currency={o.currency} /> spent</span>)}</p>}
 
           <div className="grid-2">
@@ -168,6 +204,12 @@ export function Dashboard() {
                   </li>
                 ))}
               </ul>
+              {x.balanceHistory && x.balanceHistory.length > 1 && (
+                <div className="balance-chart">
+                  <h3 className="section-title">Balance, last 90 days <Info label="How is this worked out?">Worked back from the balance your bank reports, using your transactions. Current and savings accounts in totals only.</Info></h3>
+                  <BalanceChart points={x.balanceHistory} currency={x.currency} />
+                </div>
+              )}
               <p className="help">{m.dashboard.lastSync}: {fmt.ago(x.sync.lastSuccess)}</p>
             </Card>
             <Card title={m.dashboard.upcoming} actions={<Link to="/recurring">{m.dashboard.viewAll}</Link>}>

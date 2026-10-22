@@ -3,6 +3,7 @@ export type Tx = {
   amount_minor: number; currency: string; original_pending_amount_minor: number | null; booking_date: string; value_date: string | null; description: string;
   counterparty: string | null; merchant: string; note: string | null; excluded: number; type: string; category_id: number | null; category_name: string | null;
   category_color: string | null; category_source: string; confidence: string; type_overridden: number; transfer_peer_id: number | null; needs_review: string | null;
+  paid_back_for_id: number | null; paid_back_minor: number | null;
 };
 export type Category = { id: number; key: string | null; name: string; color: string; icon: string | null; is_system: number; archived_at: string | null; tx_count: number };
 export type Account = { id: number; connection_id: number | null; name: string; display_name: string | null; iban_last4: string | null; currency: string; kind: string; included: number; balance_minor: number | null; balance_label: string | null; balance_at: string | null; synced_through: string | null; latest_tx_date: string | null; tx_count: number };

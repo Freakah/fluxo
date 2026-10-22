@@ -30,7 +30,8 @@ export const TX_SELECT = `
     ${EFF_TYPE} AS type, ${EFF_CAT} AS category_id, c.name AS category_name, c.color AS category_color,
     CASE WHEN t.category_override_id IS NOT NULL THEN 'user' ELSE t.auto_source END AS category_source,
     CASE WHEN t.category_override_id IS NOT NULL THEN 'certain' ELSE t.auto_confidence END AS confidence,
-    t.type_override IS NOT NULL AS type_overridden, t.transfer_peer_id, t.needs_review
+    t.type_override IS NOT NULL AS type_overridden, t.transfer_peer_id, t.needs_review, t.paid_back_for_id,
+    (SELECT SUM(p.amount_minor) FROM transactions p WHERE p.paid_back_for_id = t.id AND p.user_id = t.user_id) AS paid_back_minor
   FROM transactions t JOIN accounts a ON a.id = t.account_id LEFT JOIN categories c ON c.id = ${EFF_CAT}`;
 
 export function txWhere(userId: number, f: TxFilter, currency = 'EUR'): { sql: string; params: (string | number)[] } {

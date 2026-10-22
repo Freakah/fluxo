@@ -8,7 +8,13 @@ import { Art, type ArtName } from './illustrations.tsx';
 export function Money({ minor, currency, sign, className }: { minor: number | null | undefined; currency?: string; sign?: 'auto' | 'always' | 'exceptZero'; className?: string }) {
   const { fmt } = useSession();
   const cls = minor !== null && minor !== undefined && minor > 0 && sign === 'always' ? 'pos' : '';
-  return <span className={`money ${cls} ${className ?? ''}`}>{fmt.money(minor, currency, sign)}</span>;
+  return <span className={`money ${cls} ${className ?? ''}`}>{withCents(fmt.money(minor, currency, sign))}</span>;
+}
+
+/** Shows the cents a little smaller than the whole amount, as banking apps do ("1,587.93 €" in any locale). */
+function withCents(text: string) {
+  const x = /^(.*\d)([.,]\d{2})(\D*)$/.exec(text);
+  return x ? <>{x[1]}<span className="cents">{x[2]}</span>{x[3]}</> : text;
 }
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -31,7 +37,7 @@ export function CountUp({ minor, currency, sign }: { minor: number; currency?: s
   }, [minor]);
   return (
     <span className="money">
-      <span aria-hidden="true">{fmt.money(shown, currency, sign)}</span>
+      <span aria-hidden="true">{withCents(fmt.money(shown, currency, sign))}</span>
       <span className="sr-only">{fmt.money(minor, currency, sign)}</span>
     </span>
   );

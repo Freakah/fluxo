@@ -606,3 +606,82 @@ html, body { overflow-x: clip; }
 @media (max-width: 600px) {
   .info-pop { position: fixed; left: 1rem; right: 1rem; top: auto; bottom: 5.5rem; transform: none; width: auto; max-width: none; }
 }
+
+/* ---------- Round 3: review inbox, paid back, recap, hints, balance, text size, mobile sheet */
+:root[data-text-size='large'] { font-size: 18px; }
+:root[data-text-size='xlarge'] { font-size: 20px; }
+/* Smaller cents only on headline numbers; amounts inside sentences stay plain. */
+.stat-value .cents, .tx-amount .cents, .hero-side-top strong .cents, .acct-card .cents { font-size: .75em; }
+.hero-big .cents, .recap-big .cents, .review-amount .cents, .detail-amount .cents { font-size: .6em; }
+
+/* Day headers stay visible while scrolling through Activity */
+.day-head { position: sticky; top: 58px; z-index: 2; background: var(--surface); margin: 0 -.25rem; padding-left: .75rem; padding-right: .75rem; border-radius: 8px; }
+
+/* Home nudges (things to do) and hints (things to know) */
+.nudge { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); background: linear-gradient(90deg, var(--accent-soft), var(--surface) 70%); }
+.nudge > div:first-of-type { flex: 1; min-width: 200px; }
+.nudge h2 { font-size: 1.1rem; }
+.nudge p { margin: .15rem 0 0; }
+.recap-nudge { border-color: color-mix(in srgb, var(--warn) 30%, var(--border)); background: linear-gradient(90deg, var(--warn-bg), var(--surface) 70%); }
+.hints { display: flex; flex-direction: column; gap: .5rem; }
+.hint-row { display: flex; align-items: center; gap: .75rem; padding: .8rem 1rem; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); color: var(--text); text-decoration: none; box-shadow: var(--shadow-sm); }
+.hint-row:hover { border-color: var(--border-strong); }
+.hint-row > span:nth-child(2) { flex: 1; }
+.hint-icon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--warn-bg); color: var(--warn); flex-shrink: 0; }
+.balance-chart { margin-top: .75rem; }
+.balance-chart .section-title { display: flex; align-items: center; gap: .2rem; }
+
+/* Review inbox */
+.page-narrow { max-width: 640px; }
+.review-progress { display: flex; align-items: center; gap: .8rem; color: var(--muted); }
+.review-progress .progress { flex: 1; }
+.review-card { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: .35rem; padding: 2rem 1.25rem 1.5rem; touch-action: pan-y; user-select: none; transition: transform .2s ease-out; animation: rise .25s ease-out; }
+.review-merchant { font-size: 1.5rem; margin-top: .5rem; overflow-wrap: anywhere; }
+.review-amount { font-size: 2.25rem; font-weight: 750; letter-spacing: -.02em; }
+.review-question { font-size: 1.15rem; margin: .75rem 0 0; }
+.review-desc { margin: .25rem 0 0; max-width: 46ch; }
+.review-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.review-more { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+.review-more .link { display: inline-flex; align-items: center; gap: .3rem; }
+.swipe-tag { position: absolute; top: 1rem; display: inline-flex; align-items: center; gap: .3rem; font-weight: 700; padding: .3rem .7rem; border-radius: 999px; }
+.swipe-tag.ok { left: 1rem; background: var(--ok-bg); color: var(--ok); }
+.swipe-tag.change { right: 1rem; background: var(--accent-soft); color: var(--accent); }
+.center { text-align: center; }
+@media (max-width: 480px) { .review-actions { grid-template-columns: 1fr; } .review-actions .btn-primary { order: -1; } }
+
+/* Paid back picker */
+.pick-list { display: flex; flex-direction: column; gap: .4rem; }
+.pick-item { display: flex; align-items: center; gap: .75rem; width: 100%; text-align: left; padding: .7rem .8rem; border: 2px solid var(--border); border-radius: 12px; background: var(--surface); cursor: pointer; }
+.pick-item[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); }
+.pick-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-strong); flex-shrink: 0; }
+.pick-item[aria-checked='true'] .pick-dot { border: 6px solid var(--accent); }
+.pick-item .item-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+/* Monthly recap */
+.recap-slide { min-height: 320px; justify-content: center; }
+.recap-slide .cat-icon, .recap-slide .monogram { margin-bottom: .25rem; }
+.recap-kicker { color: var(--muted); font-weight: 600; margin: .5rem 0 0; }
+.recap-big { font-size: 2rem; font-weight: 750; letter-spacing: -.02em; margin: 0; display: flex; align-items: center; gap: .4rem; justify-content: center; }
+.recap-cheer { display: flex; align-items: center; gap: .4rem; font-weight: 600; color: var(--text-2); }
+.recap-slide .trend { margin: 0; }
+.text-sample { display: flex; align-items: center; justify-content: center; gap: .3rem; background: var(--surface-2); font-weight: 700; }
+
+/* Phones: the detail panel slides up from the bottom as a sheet */
+@keyframes sheetup { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 600px) {
+  .day-head { top: 54px; }
+  .modal-side { margin: auto 0 0; width: 100vw; max-width: 100vw; height: auto; max-height: 92vh; border-radius: 20px 20px 0 0; }
+  .modal-side[open] { animation: sheetup .24s ease-out; }
+  .modal-side .modal-inner { height: auto; max-height: 92vh; }
+  .modal-side .modal-head::before { content: ''; position: absolute; top: 6px; left: 50%; width: 40px; height: 4px; margin-left: -20px; border-radius: 4px; background: var(--border-strong); }
+  .modal-side .modal-head { position: relative; padding-top: 1.1rem; }
+}
+/* Phones: badges go on their own line so the merchant name always has room */
+@media (max-width: 600px) {
+  .tx-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: .75rem; row-gap: 3px; }
+  .tx-main > .cat-icon { grid-row: 1 / 3; align-self: center; }
+  .tx-right { display: contents; }
+  .tx-text { grid-column: 2; grid-row: 1; }
+  .tx-amount { grid-column: 3; grid-row: 1; align-self: start; }
+  .tx-badges { grid-column: 2 / 4; grid-row: 2; justify-content: flex-start; }
+}

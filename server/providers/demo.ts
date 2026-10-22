@@ -104,7 +104,7 @@ function day(scenario: Scenario, date: string, anchor: string): Gen[] {
   }
   if (dom === 8) out.push({ acct: A, date, amount: -between(r, 3800, 7200), desc: 'DD EDP COMERCIAL ELECTRICIDADE' });
   if (dom === 10) out.push({ acct: A, date, amount: -4000, desc: 'COMPRA 4521 NAVEGANTE METROPOLITANO LISBOA' });
-  if (dom === 12) out.push({ acct: A, date, amount: -799, desc: 'COMPRA 4521 SPOTIFY P1A2B3' });
+  if (dom === 12) out.push({ acct: A, date, amount: rel > -25 ? -899 : -799, desc: 'COMPRA 4521 SPOTIFY P1A2B3' }); // price rise shows up as a hint
   if (dom === 15) out.push({ acct: A, date, amount: -3290, desc: 'DD FITNESS HUT MENSALIDADE' });
   if (dom === 18) out.push({ acct: A, date, amount: -between(r, 1400, 2600), desc: 'DD EPAL AGUAS' });
   if (dom === 20) {
@@ -125,6 +125,8 @@ function day(scenario: Scenario, date: string, anchor: string): Gen[] {
   if (rel === -5) out.push({ acct: A, date, amount: 3490, desc: 'REEMBOLSO AMAZON EU SARL' });
   if (rel === -6) out.push({ acct: A, date, amount: -180, desc: 'COMPRA 4521 PASTELARIA SAO ROQUE', card: true }, { acct: A, date, amount: -180, desc: 'COMPRA 4521 PASTELARIA SAO ROQUE', card: true });
   if (rel === -4) out.push({ acct: A, date, amount: -15000, desc: 'COMPRA 4521 HOTEL EXEMPLO LISBOA PRE-AUTORIZACAO', card: true, neverPosts: true });
+  if (rel === -9) out.push({ acct: A, date, amount: -6400, desc: 'COMPRA 4521 CERVEJARIA RAMIRO', card: true });
+  if (rel === -7) out.push({ acct: A, date, amount: 3200, desc: 'MBWAY DE 961***204' }); // a friend paying their half of dinner
   if (rel === -3) out.push({ acct: A, date, amount: -2340, desc: 'COMPRA 4521 PINGO DOCE AMOREIRAS', card: true, postedAmount: -2385 });
 
   for (const pool of POOLS) {

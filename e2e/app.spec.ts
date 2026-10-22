@@ -37,7 +37,7 @@ test('welcome, tour and home', async ({ page }) => {
   const tour = page.getByRole('dialog', { name: 'Home' });
   await expect(tour).toBeVisible();
   await tour.getByRole('button', { name: 'Next' }).click();
-  await expect(page.getByRole('dialog', { name: 'Activity' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'To review' })).toBeVisible();
   await page.getByRole('button', { name: 'End tour' }).click();
   await expect(page.getByRole('heading', { name: /Dashboard/ })).toBeVisible();
 
@@ -200,4 +200,51 @@ test('command palette jumps to a page', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/transactions\?q=netflix/);
   await expect(page.getByText(/^[1-9]\d* transactions/)).toBeVisible();
+});
+
+test('review inbox, paid back, hints, recap and text size', async ({ page }) => {
+  await startDemo(page);
+  await expect(page.getByText(/new payments to check/)).toBeVisible();
+  await expect(page.getByRole('link', { name: /Spotify went up from €7\.99 to €8\.99/ })).toBeVisible();
+  await page.getByRole('link', { name: 'Check them' }).click();
+  await expect(page.getByRole('heading', { name: 'To review', level: 1 })).toBeVisible();
+  const progress = page.locator('.review-progress');
+  await expect(progress).toContainText(/^1 of (\d+)/);
+  const total = Number((await progress.textContent())!.match(/of (\d+)/)![1]);
+  await a11y(page);
+  await page.getByRole('button', { name: /That’s right|Leave it for now/i }).click();
+  await expect(progress).toContainText(`2 of ${total}`);
+  await page.getByRole('button', { name: 'Change category' }).click();
+  const pick = page.getByRole('dialog');
+  await pick.getByRole('radio', { name: 'Shopping' }).click();
+  await pick.getByRole('button', { name: 'Save' }).click();
+  await expect(progress).toContainText(`3 of ${total}`);
+  await page.getByRole('button', { name: 'Mark all as checked' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Mark all as checked' }).click();
+  await expect(page.getByText('All caught up')).toBeVisible();
+
+  // A friend's MB WAY pays back half a dinner.
+  await go(page, 'Activity');
+  await page.getByLabel('Search merchant, description or note').fill('961');
+  await page.getByRole('button', { name: /Open MB WAY from 961/ }).click();
+  await page.getByRole('button', { name: 'This paid me back for something' }).click();
+  const picker = page.getByRole('dialog', { name: 'This paid me back for something' });
+  await picker.getByRole('radio', { name: /Cervejaria Ramiro/ }).first().click();
+  await a11y(page);
+  await picker.getByRole('button', { name: 'Link them' }).click();
+  await expect(page.getByText(/Only your share counts/)).toBeVisible();
+  await expect(page.locator('.txlist .tx').first().getByText('Refund')).toBeVisible();
+
+  await go(page, 'Insights');
+  await page.getByRole('button', { name: 'Last month’s recap' }).click();
+  const recap = page.getByRole('dialog', { name: /Your month/ });
+  await expect(recap.getByText(/you spent/)).toBeVisible();
+  for (let k = 0; k < 6 && await recap.getByRole('button', { name: 'Next' }).isVisible(); k++) await recap.getByRole('button', { name: 'Next' }).click();
+  await expect(recap.getByText(/Budgets kept/)).toBeVisible();
+  await recap.getByRole('button', { name: 'Close' }).last().click();
+
+  await go(page, 'Settings');
+  await page.getByRole('radio', { name: 'Large', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-text-size', 'large');
+  await expect(page.getByRole('heading', { name: 'Install Fluxo as an app' })).toBeVisible();
 });

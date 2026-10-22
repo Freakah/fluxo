@@ -8,6 +8,8 @@ export type Settings = {
   budgetThresholds: number[];
   notify: { budget: boolean; sync: boolean; consent: boolean; recurring: boolean };
   onboarded: boolean; // first-run welcome seen
+  recapSeen: string | null; // last month whose recap was opened or dismissed (YYYY-MM)
+  textSize: 'normal' | 'large' | 'xlarge';
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -19,6 +21,8 @@ export const DEFAULT_SETTINGS: Settings = {
   budgetThresholds: [80, 100],
   notify: { budget: true, sync: true, consent: true, recurring: true },
   onboarded: false,
+  recapSeen: null,
+  textSize: 'normal',
 };
 
 export function mergeSettings(raw: unknown): Settings {

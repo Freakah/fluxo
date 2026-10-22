@@ -2,7 +2,7 @@
 // and selected from the locale setting. Keep amounts/dates out of strings; format them with format.ts.
 export const en = {
   app: { name: 'Fluxo', tagline: 'Connect your bank account, let transactions sync automatically, and understand where your money goes.' },
-  nav: { dashboard: 'Home', transactions: 'Activity', budgets: 'Budgets', recurring: 'Bills', reports: 'Insights', accounts: 'Banks', categories: 'Categories', settings: 'Settings', help: 'Help', notifications: 'Notifications', signOut: 'Sign out', skip: 'Skip to content', menu: 'Menu', more: 'More', groupMoney: 'Your money', groupSetup: 'Setup', search: 'Search', searchHint: 'Jump to a page or search your activity', profile: 'Account menu' },
+  nav: { dashboard: 'Home', transactions: 'Activity', budgets: 'Budgets', recurring: 'Bills', reports: 'Insights', accounts: 'Banks', categories: 'Categories', settings: 'Settings', help: 'Help', notifications: 'Notifications', signOut: 'Sign out', skip: 'Skip to content', menu: 'Menu', more: 'More', groupMoney: 'Your money', groupSetup: 'Setup', search: 'Search', searchHint: 'Jump to a page or search your activity', profile: 'Account menu', review: 'To review' },
   common: {
     save: 'Save', cancel: 'Cancel', close: 'Close', delete: 'Delete', edit: 'Edit', retry: 'Try again', loading: 'Loading…', undo: 'Undo', apply: 'Apply', reset: 'Reset',
     confirm: 'Confirm', saved: 'Saved', none: 'None', all: 'All', yes: 'Yes', no: 'No', showTable: 'Show as table', showChart: 'Show as chart', back: 'Back',
@@ -78,6 +78,8 @@ export const en = {
     notifications: 'In-app notifications', nBudget: 'Budget thresholds', nSync: 'Sync problems', nConsent: 'Bank access expiring', nRecurring: 'New recurring payments',
     security: 'Security', sessions: 'Signed-in sessions', thisDevice: 'This device', signOutOthers: 'Sign out all other sessions', changePassword: 'Change password', current: 'Current password', next: 'New password',
     mfa: 'Two-step verification (TOTP)', mfaOn: 'On', mfaOff: 'Off', mfaSetup: 'Set up', mfaDisable: 'Turn off', mfaScan: 'Add this secret to your authenticator app, then enter the 6-digit code it shows.',
+    display: 'Display', textSize: 'Text size', textNormal: 'Normal', textLarge: 'Large', textXlarge: 'Extra large', textHelp: 'Makes all text and buttons bigger. Your browser zoom (Ctrl and +) works too.',
+    install: 'Install Fluxo as an app', installHelp: 'Adds Fluxo to your Start menu, dock or home screen and opens it in its own window, without the browser bar.', installed: 'Fluxo is installed on this device.', installManual: 'In Chrome or Edge, open the browser menu and choose “Install Fluxo” (or “Apps → Install”). On an iPhone, use Share → “Add to Home Screen”.',
     privacy: 'Privacy and data', privacyText: 'Fluxo stores your account list, transactions, balances and your own labels on this server only. No analytics or trackers. Nothing is sent to AI services.',
     exportAll: 'Download all my data (JSON)', deleteImported: 'Delete all imported bank data', deleteImportedText: 'Disconnects every bank, then deletes all imported accounts and transactions. Your login, categories and rules stay. Type DELETE to confirm.',
     deleteAccount: 'Delete my account', deleteAccountText: 'Deletes your login and everything stored for you on this server. Backups made earlier expire on their own schedule (see docs/BACKUP.md). Type DELETE MY ACCOUNT to confirm.',
@@ -94,6 +96,7 @@ export const en = {
     next: 'Next', back: 'Back', done: 'Done', skip: 'End tour',
     steps: [
       { target: 'nav-home', title: 'Home', text: 'Your month at a glance: what you spent, what is left, and where it went.' },
+      { target: 'nav-review', title: 'To review', text: 'New payments wait here. Check each one with one tap so your numbers stay right.' },
       { target: 'nav-activity', title: 'Activity', text: 'Every payment, grouped by day. Tap one to see details or change its category.' },
       { target: 'nav-budgets', title: 'Budgets', text: 'Set a limit for the month or for a category and watch the rings fill up.' },
       { target: 'nav-bills', title: 'Bills', text: 'Subscriptions and bills Fluxo spotted, with a calendar of what is coming.' },
@@ -103,6 +106,20 @@ export const en = {
       { target: 'privacy', title: 'Hide amounts', text: 'In a public place? Hide all amounts with one tap.' },
     ],
   },
+  review: {
+    title: 'To review', subtitle: 'New payments from the last 30 days. Check each one is in the right category — it takes a few seconds.',
+    right: 'Yes, that’s right', change: 'Change category', leave: 'Leave it for now', skip: 'Skip for now', chooseFor: 'Category for',
+    allRight: 'Mark all as checked', allRightText: 'Every payment waiting here will be marked as checked, with the categories it has now. You can still change any of them later in Activity.',
+    empty: 'All caught up', emptyText: 'New payments will appear here after your bank updates.', backHome: 'Back to Home',
+    swipeHint: 'Tip: swipe the card right if it is right, or left to change it.', homeTitle: 'new payments to check', homeText: 'Make sure each one is in the right category.', homeButton: 'Check them',
+  },
+  paidBack: {
+    title: 'Paid back', someonePaid: 'Someone paid me back for this', thisPaidBack: 'This paid me back for something', link: 'Link them',
+    pickExpense: 'Pick the payment this money was for — for example, a dinner you paid for and a friend sent their half. Only your share will count as spending.',
+    pickIncoming: 'Pick the money you got back for this — for example, a friend’s MB WAY for their half. Only your share will count as spending.',
+    none: 'No matching payments in the 60 days around this one.',
+  },
+  recap: { open: 'See your recap', cardTitle: 'Your {month} recap is ready', cardText: 'A quick look back at last month, in five short cards.', title: 'Your month', later: 'Not now' },
   notifications: { title: 'Notifications', empty: 'You are all caught up', markAll: 'Mark all as read', markRead: 'Mark as read', markUnread: 'Mark as unread' },
   errors: { generic: 'Something went wrong.', offline: 'You are offline. Data shown may be out of date and changes cannot be saved.' },
 };

@@ -35,8 +35,15 @@ export function reclassify(db: DB, userId: number, ids?: number[]): number {
       const type = r.transfer_peer_id ? 'transfer' : c.type;
       upd.run(type === 'transfer' ? null : c.categoryId, c.source, c.confidence, c.ruleId, type, r.id);
     }
+    syncPaidBack(db, userId);
   });
   return rows.length;
+}
+
+/** A "paid back" payment always sits in the same category as the expense it repays, even after recategorizing. */
+export function syncPaidBack(db: DB, userId: number) {
+  run(db, `UPDATE transactions SET category_override_id = (SELECT COALESCE(e.category_override_id, e.auto_category_id) FROM transactions e WHERE e.id = transactions.paid_back_for_id)
+    WHERE user_id = ? AND paid_back_for_id IS NOT NULL`, userId);
 }
 
 /** Classification preview without writing (used by the rule preview endpoint). */

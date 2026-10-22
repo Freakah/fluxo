@@ -4,12 +4,12 @@ import { z } from 'zod';
 import { all, get, run, tx, nowIso } from '../db/db.ts';
 import { body, HttpError, uid, type Deps, type Env } from '../context.ts';
 import { txFilterSchema, txWhere, TX_SELECT, TX_ORDER } from '../domain/txquery.ts';
-import { reclassify, detectTransfers, previewRule, unpairTransfer } from '../domain/reclassify.ts';
+import { reclassify, detectTransfers, previewRule, unpairTransfer, syncPaidBack } from '../domain/reclassify.ts';
 import { detectRecurring } from '../domain/recurring.ts';
 import { checkBudgetAlerts, userSettings } from '../domain/notifications.ts';
 import { toCsv, textCell, numberCell } from '../domain/csv.ts';
 import { minorToDecimal, parseAmountToMinor } from '../../shared/money.ts';
-import { isDate, todayIn } from '../../shared/dates.ts';
+import { addDays, isDate, todayIn } from '../../shared/dates.ts';
 import { normalizeMerchant } from '../domain/merchants.ts';
 
 const TYPES = ['expense', 'income', 'refund', 'transfer'] as const;
@@ -28,7 +28,7 @@ export function dataRoutes(deps: Deps) {
     if (!t) throw new HttpError(404, 'Transaction not found');
     return t;
   };
-  const refreshDerived = (userId: number) => { detectRecurring(db, userId); checkBudgetAlerts(db, userId); };
+  const refreshDerived = (userId: number) => { syncPaidBack(db, userId); detectRecurring(db, userId); checkBudgetAlerts(db, userId); };
 
   // ---- Transactions
   app.get('/transactions', (c) => {
@@ -66,7 +66,9 @@ export function dataRoutes(deps: Deps) {
       'SELECT auto_source, auto_confidence, auto_rule_id, auto_category_id, category_override_id, type_override, auto_type, bank_code, mcc, first_seen_at, last_seen_at FROM transactions WHERE id = ?', id)!;
     const rule = extra.auto_rule_id ? get(db, 'SELECT id, field, match_type, pattern FROM rules WHERE id = ?', extra.auto_rule_id) : null;
     const peer = t.transfer_peer_id ? get(db, 'SELECT t.id, t.booking_date, t.amount_minor, t.currency, a.name AS account_name FROM transactions t JOIN accounts a ON a.id = t.account_id WHERE t.id = ? AND t.user_id = ?', t.transfer_peer_id, uid(c)) : null;
-    return c.json({ ...t, ...extra, rule, peer });
+    const paidBackFor = get(db, `${TX_SELECT} WHERE t.id = (SELECT paid_back_for_id FROM transactions WHERE id = ?) AND t.user_id = ?`, id, uid(c)) ?? null;
+    const paidBackBy = all(db, `${TX_SELECT} WHERE t.paid_back_for_id = ? AND t.user_id = ? ORDER BY t.booking_date`, id, uid(c));
+    return c.json({ ...t, ...extra, rule, peer, paidBackFor, paidBackBy });
   });
 
   const patchSchema = z.object({
@@ -81,6 +83,8 @@ export function dataRoutes(deps: Deps) {
     tx(db, () => {
       for (const id of ids) {
         const t = ownTx(userId, id);
+        // Any change the user makes counts as having looked at the payment.
+        run(db, 'UPDATE transactions SET reviewed_at = ? WHERE id = ?', nowIso(), id);
         if (p.categoryId !== undefined) run(db, 'UPDATE transactions SET category_override_id = ?, updated_at = ? WHERE id = ?', p.categoryId, nowIso(), id);
         if (p.note !== undefined) run(db, 'UPDATE transactions SET note = ?, updated_at = ? WHERE id = ?', p.note?.trim() || null, nowIso(), id);
         if (p.excluded !== undefined) run(db, 'UPDATE transactions SET excluded = ?, updated_at = ? WHERE id = ?', p.excluded ? 1 : 0, nowIso(), id);
@@ -106,6 +110,57 @@ export function dataRoutes(deps: Deps) {
     return c.json({ ok: true, updated: b.ids.length });
   });
 
+  // ---- Review inbox: recent payments the user has not looked at yet, oldest first.
+  const REVIEW_WHERE = `t.user_id = ? AND t.reviewed_at IS NULL AND t.excluded = 0 AND t.status <> 'cancelled' AND COALESCE(t.type_override, t.auto_type) <> 'transfer' AND t.booking_date >= ?`;
+  const reviewSince = (userId: number) => addDays(todayIn(userSettings(db, userId).timezone), -30);
+  app.get('/review', (c) => {
+    const userId = uid(c);
+    const since = reviewSince(userId);
+    const rows = all(db, `${TX_SELECT} WHERE ${REVIEW_WHERE} ORDER BY t.booking_date ASC, t.id ASC LIMIT 100`, userId, since);
+    const total = get<{ n: number }>(db, `SELECT COUNT(*) n FROM transactions t WHERE ${REVIEW_WHERE}`, userId, since)!.n;
+    return c.json({ rows, total });
+  });
+  app.get('/review/count', (c) => c.json({ total: get<{ n: number }>(db, `SELECT COUNT(*) n FROM transactions t WHERE ${REVIEW_WHERE}`, uid(c), reviewSince(uid(c)))!.n }));
+  app.post('/review/done', async (c) => {
+    const b = await body(c, z.object({ ids: z.array(z.number().int()).max(500).optional() }));
+    const userId = uid(c);
+    if (b.ids) for (const id of b.ids) run(db, 'UPDATE transactions SET reviewed_at = ? WHERE id = ? AND user_id = ?', nowIso(), id, userId);
+    else run(db, `UPDATE transactions AS t SET reviewed_at = ? WHERE ${REVIEW_WHERE}`, nowIso(), userId, reviewSince(userId));
+    return c.json({ ok: true });
+  });
+
+  // ---- Paid back: link an incoming payment (a friend paying their share) to the expense it repays.
+  // The incoming payment becomes a refund in the expense's category, so only your share counts as spending.
+  // Candidates: amounts that could contain the other (exact or half first), then the closest dates.
+  app.get('/transactions/:id/payback-candidates', (c) => {
+    const userId = uid(c);
+    const t = get<{ amount_minor: number; booking_date: string; currency: string }>(db, 'SELECT amount_minor, booking_date, currency FROM transactions WHERE id = ? AND user_id = ?', Number(c.req.param('id')), userId);
+    if (!t) throw new HttpError(404, 'Transaction not found');
+    const incoming = t.amount_minor > 0;
+    const [from, to] = incoming ? [addDays(t.booking_date, -60), addDays(t.booking_date, 3)] : [addDays(t.booking_date, -3), addDays(t.booking_date, 60)];
+    const rows = all(db, `${TX_SELECT} WHERE t.user_id = ? AND t.currency = ? AND t.status = 'posted' AND t.booking_date BETWEEN ? AND ? AND t.paid_back_for_id IS NULL AND
+      ${incoming ? "t.amount_minor < 0 AND COALESCE(t.type_override, t.auto_type) = 'expense'" : "t.amount_minor > 0 AND COALESCE(t.type_override, t.auto_type) IN ('income','refund')"}
+      ORDER BY ${incoming ? 'ABS(t.amount_minor) < ?, ABS(t.amount_minor) NOT IN (?, ? * 2)' : 'ABS(t.amount_minor) > ?, ABS(t.amount_minor) NOT IN (?, ? / 2.0)'},
+        ABS(julianday(t.booking_date) - julianday(?)) ASC, t.id DESC LIMIT 30`, userId, t.currency, from, to, ...Array(3).fill(Math.abs(t.amount_minor)), t.booking_date);
+    return c.json(rows);
+  });
+
+  app.put('/paid-back', async (c) => {
+    const b = await body(c, z.object({ expenseId: z.number().int(), incomingId: z.number().int(), linked: z.boolean() }));
+    const userId = uid(c);
+    const exp = get<{ amount_minor: number; currency: string; cat: number | null }>(db, 'SELECT amount_minor, currency, COALESCE(category_override_id, auto_category_id) cat FROM transactions WHERE id = ? AND user_id = ?', b.expenseId, userId);
+    const inc = get<{ amount_minor: number; currency: string; paid_back_for_id: number | null }>(db, 'SELECT amount_minor, currency, paid_back_for_id FROM transactions WHERE id = ? AND user_id = ?', b.incomingId, userId);
+    if (!exp || !inc) throw new HttpError(404, 'Transaction not found');
+    if (b.linked) {
+      if (exp.amount_minor >= 0 || inc.amount_minor <= 0 || exp.currency !== inc.currency) throw new HttpError(400, 'Pick a payment you made and money you received in the same currency.');
+      run(db, "UPDATE transactions SET paid_back_for_id = ?, type_override = 'refund', category_override_id = ?, reviewed_at = ?, updated_at = ? WHERE id = ?", b.expenseId, exp.cat, nowIso(), nowIso(), b.incomingId);
+    } else if (inc.paid_back_for_id === b.expenseId) {
+      run(db, 'UPDATE transactions SET paid_back_for_id = NULL, type_override = NULL, category_override_id = NULL, updated_at = ? WHERE id = ?', nowIso(), b.incomingId);
+    }
+    refreshDerived(userId);
+    return c.json({ ok: true });
+  });
+
   // Manual cash entries: a secondary convenience, always marked as manual.
   app.post('/transactions/manual', async (c) => {
     const b = await body(c, z.object({ date: z.string().refine(isDate), amount: z.string().regex(/^-?\d+(\.\d{1,2})?$/), description: z.string().min(1).max(140), categoryId: z.number().int().nullable().optional() }));
@@ -115,8 +170,8 @@ export function dataRoutes(deps: Deps) {
     let acct = get<{ id: number }>(db, "SELECT id FROM accounts WHERE user_id = ? AND kind = 'cash' AND currency = ?", userId, s.currency);
     acct ??= { id: run(db, "INSERT INTO accounts (user_id, identity_hash, name, currency, kind, created_at) VALUES (?, ?, 'Cash (manual)', ?, 'cash', ?)", userId, `cash:${s.currency}`, s.currency, nowIso()).id };
     const amount = parseAmountToMinor(b.amount, s.currency);
-    const id = run(db, `INSERT INTO transactions (user_id, account_id, source, status, amount_minor, currency, booking_date, description, merchant, first_seen_at, last_seen_at, auto_type, category_override_id, updated_at)
-      VALUES (?, ?, 'manual', 'posted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, userId, acct.id, amount, s.currency, b.date, b.description, normalizeMerchant(b.description), nowIso(), nowIso(), amount < 0 ? 'expense' : 'income', b.categoryId ?? null, nowIso()).id;
+    const id = run(db, `INSERT INTO transactions (user_id, account_id, source, status, amount_minor, currency, booking_date, description, merchant, first_seen_at, last_seen_at, auto_type, category_override_id, updated_at, reviewed_at)
+      VALUES (?, ?, 'manual', 'posted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, userId, acct.id, amount, s.currency, b.date, b.description, normalizeMerchant(b.description), nowIso(), nowIso(), amount < 0 ? 'expense' : 'income', b.categoryId ?? null, nowIso(), nowIso()).id;
     reclassify(db, userId, [id]);
     refreshDerived(userId);
     return c.json({ id });
