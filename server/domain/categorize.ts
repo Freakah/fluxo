@@ -77,12 +77,11 @@ export function classify(tx: TxInput, sortedRules: Rule[], cat: (k: CategoryKey)
 
   if (tx.bank_code && /CWDL/.test(tx.bank_code) && !incoming) return { categoryId: cat('cash'), source: 'bank_code', confidence: 'high', ruleId: null, type };
 
-  if (!ambiguous) {
-    for (const d of DESCRIPTION_RULES) {
-      if (d.direction === 'in' && !incoming) continue;
-      if (d.direction === 'out' && incoming && type !== 'refund') continue;
-      if (d.re.test(text)) return { categoryId: cat(d.category), source: 'description', confidence: d.category === 'income' ? 'medium' : 'low', ruleId: null, type };
-    }
+  for (const d of DESCRIPTION_RULES) {
+    if (ambiguous && d.category !== 'bank_fees') continue; // a fee charged on an MB WAY transfer is still a fee
+    if (d.direction === 'in' && !incoming) continue;
+    if (d.direction === 'out' && incoming && type !== 'refund') continue;
+    if (d.re.test(text)) return { categoryId: cat(d.category), source: 'description', confidence: d.category === 'income' ? 'medium' : 'low', ruleId: null, type };
   }
   if (type === 'income') return { categoryId: cat('income'), source: 'none', confidence: 'low', ruleId: null, type };
   return { categoryId: cat('uncategorized'), source: 'none', confidence: 'none', ruleId: null, type };
