@@ -27,13 +27,43 @@ original task; this file tracks status.
 | D14 | Account recovery: CLI `npm run reset-password` (self-hosted, no email service) | No external messaging cost |
 | D15 | Registration: first user only, unless `ALLOW_REGISTRATION=true` | Safe default for self-hosting |
 
-## Completed
-(see bottom: updated as milestones land)
+## Completed (2026-10-22)
+- [x] All screens: Dashboard, Transactions (+detail, bulk, cash entry), Budgets, Recurring, Reports, Accounts & connections, Categories & rules, Settings & privacy, Notifications, Help, simulated bank consent page
+- [x] Exact money (minor units), shared aggregate rules, multi-currency separation, Lisbon month boundaries
+- [x] Categorization precedence with explanation/confidence; rules with preview, priority, disable, delete; corrections survive re-sync
+- [x] Sync engine: pagination, overlap window, idempotent ids/fingerprints (+occurrence index), pending→posted, disappearing pending, locks, backoff, rate limits, partial failure, interrupted recovery, background limit, honest PSU headers, reconnect identity mapping, undecryptable-session handling
+- [x] Transfers (own accounts only), refunds policy, budgets (thresholds, mid-month rule, no rollover), deduplicated notifications, recurring detection
+- [x] Enable Banking adapter (JWT RS256, aspsps, auth, sessions, balances, transactions, revoke, error mapping)
+- [x] Auth: scrypt, hashed sessions, idle/absolute expiry, revoke others, TOTP, rate limits, CSRF, CSP/HSTS, CLI recovery
+- [x] Privacy: full export, CSV export (injection-safe), disconnect (revoke), delete imported, delete account, deletion log
+- [x] Backup/restore with deletion re-application; ops scripts; secret scanner
+- [x] Demo mode: deterministic Portuguese data incl. failing sync + expired consent; per-visitor workspaces; reset
+- [x] Docs, LICENSE (holder placeholder), SECURITY, CONTRIBUTING, CHANGELOG, CI, Dependabot, templates, screenshots
 
-## Remaining
+## Remaining / future work
+- Portuguese translation file (`web/src/i18n.ts` structure ready)
+- Email/push notifications (optional), QR code for TOTP setup, code-splitting the UI bundle (~420 kB)
+- Savings goals, household sharing, receipt OCR, forecasting, AI classification (out of scope)
 
-## Verification results
+## Verification results (2026-10-22)
+| Check | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| `npm run lint` | pass |
+| `npm test` (Vitest, 66 tests: money/dates/CSV, categorization, recurring, sync engine, budgets, API security & isolation, backup/restore, Enable Banking adapter) | pass |
+| `npm run test:e2e` (16 tests: 8 flows × desktop 1280px + Pixel 7 mobile, axe WCAG A/AA serious/critical scan on 6 pages) | pass |
+| `npm run build` | pass |
+| `npm audit` | 0 vulnerabilities |
+| `npm run scan:secrets` | clean |
+| Fresh clone → `npm ci` → build → tests → demo server | pass |
+| Live mode without provider; first-user registration; backup + restore CLIs | pass (manual) |
+| Rendered UI inspected (desktop light/dark, mobile) | done; fixed contrast, mobile tables, mobile sign-out |
+| Enable Banking sandbox | NOT run (no credentials) |
+| Real Millennium bcp account | NOT run (requires user authorization) |
+
+Status categories: verified with synthetic data = everything above; verified in provider sandbox = none; verified with real account = none; implemented awaiting external setup = Enable Banking live/sandbox connectivity.
 
 ## External blockers
-- Enable Banking application (app id + private key) — needs the user to register at enablebanking.com and link their own Millennium bcp account (restricted mode). Not available to the agent.
-- Publication metadata: copyright holder name, GitHub username/repo URL.
+- Enable Banking application (app id + private key) — user must register at enablebanking.com, upload a certificate, and link their own Millennium bcp account (restricted mode). Not available to the agent.
+- Publication metadata: copyright holder name (LICENSE), GitHub owner/repo URL, security contact, `package.json` author/repository.
+- Explicit authorization to create and push a public GitHub repository.

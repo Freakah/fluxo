@@ -8,7 +8,14 @@ import { startScheduler } from './sync/scheduler.ts';
 import { log } from './log.ts';
 
 const version = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version as string;
-const config = loadConfig();
+let config: ReturnType<typeof loadConfig>;
+try { config = loadConfig(); } catch (e) {
+  console.error(`
+  Fluxo cannot start: ${(e as Error).message}
+  See .env.example and docs/TROUBLESHOOTING.md.
+`);
+  process.exit(1);
+}
 const db = openDb(config.dbPath);
 const providers = loadProviders(config);
 const syncCtx = { db, providers, key: config.encryptionKey, intervalHours: config.SYNC_INTERVAL_HOURS };
