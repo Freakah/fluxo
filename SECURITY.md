@@ -1,7 +1,7 @@
 # Security policy
 
 ## Reporting a vulnerability
-Please **do not open a public issue**. Use GitHub’s private vulnerability reporting (“Security” tab → “Report a vulnerability”) on this repository, or contact the maintainer privately. <!-- TODO before publishing: add a contact address or confirm private reporting is enabled. -->
+Please **do not open a public issue**. Use GitHub’s private vulnerability reporting: https://github.com/Freakah/fluxo/security/advisories/new
 
 Include affected version, steps to reproduce and impact. Never send real financial data, tokens or database files — synthetic data reproduces everything. We aim to acknowledge within 7 days. Supported version: the latest release.
 
