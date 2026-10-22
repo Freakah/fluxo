@@ -18,7 +18,10 @@ type Gen = { acct: string; date: string; amount: number; desc: string; counterpa
 
 function rng(seed: string) {
   let h = 1779033703 ^ seed.length;
-  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 3432918353), h = (h << 13) | (h >>> 19);
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
   let a = h >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
