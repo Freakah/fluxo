@@ -63,6 +63,14 @@ original task; this file tracks status.
 
 Status categories: verified with synthetic data = everything above; verified in provider sandbox = none; verified with real account = none; implemented awaiting external setup = Enable Banking live/sandbox connectivity.
 
+## Current status (2026-10-22, live setup)
+- Published: https://github.com/Freakah/fluxo (public, CI green, private vulnerability reporting + Dependabot on). Commits use the GitHub no-reply email.
+- Local install: `C:\Users\gusta\Fluxo`, start with `npm.cmd start` (PowerShell blocks `npm.ps1`). Runs in live mode (`.env`, git-ignored).
+- Enable Banking: production app "Fluxo (personal)" registered; app ID is in `.env`; key pair in `C:\Users\gusta\fluxo-keys` (private key never leaves that folder).
+  Redirect URL registered: https://freakah.github.io/fluxo/callback.html (GitHub Pages relay from `docs/callback.html`, set as `BANK_REDIRECT_URL`).
+  A real API call accepted the credentials; it returns "Application is not active" until accounts are linked.
+- Next: user activates the app ("Activate by linking accounts" → Millennium BCP, using the online-banking Código de Utilizador), creates the Fluxo login at http://localhost:3000, then Accounts → Connect a bank → Millennium BCP. First real end-to-end test still pending.
+
 ## External blockers
 - Enable Banking application (app id + private key) — user must register at enablebanking.com, upload a certificate, and link their own Millennium bcp account (restricted mode). Not available to the agent.
 - Publication metadata: copyright holder name (LICENSE), GitHub owner/repo URL, security contact, `package.json` author/repository.
