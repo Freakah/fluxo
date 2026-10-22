@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 const bool = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
@@ -40,8 +40,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   } else if (c.APP_MODE === 'live' || c.NODE_ENV === 'production') {
     throw new Error('DATA_ENCRYPTION_KEY is required in live mode and in production (run `npm run gen-key`).');
   } else {
-    // Demo/dev only: nothing secret is stored, so an ephemeral key is acceptable.
-    encryptionKey = randomBytes(32);
+    // Demo/dev only: nothing secret is stored (simulated sessions), so a fixed public key is acceptable
+    // and keeps demo data usable across restarts. Live mode always requires a real key.
+    encryptionKey = createHash('sha256').update('fluxo-demo-mode-not-secret').digest();
   }
   if (c.NODE_ENV === 'production' && !c.PUBLIC_URL.startsWith('https://') && !/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(c.PUBLIC_URL)) {
     throw new Error('PUBLIC_URL must use https:// in production (localhost is allowed for local-only use).');

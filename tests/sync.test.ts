@@ -177,6 +177,17 @@ describe('sync engine', () => {
     expect(get<{ status: string; next_sync_after: string | null }>(db, 'SELECT status, next_sync_after FROM connections')).toMatchObject({ status: 'expired', next_sync_after: null });
   });
 
+  it('asks for reconnection when the stored session cannot be decrypted (key rotated)', async () => {
+    const db = freshDb();
+    const u = user(db);
+    const { connectionId } = connect(db, u);
+    const p = fakeProvider({ statement: () => [] });
+    const r = await syncConnection({ ...ctxFor(db, p), key: Buffer.alloc(32, 7) }, connectionId, { trigger: 'manual' });
+    expect(r.status).toBe('failed');
+    expect(get(db, 'SELECT status, last_error_code FROM connections')).toEqual({ status: 'expired', last_error_code: 'SESSION_UNREADABLE' });
+    expect(p.calls).toHaveLength(0);
+  });
+
   it('reconnection maps accounts by stable identity: no duplicate accounts or history', async () => {
     const db = freshDb();
     const u = user(db);

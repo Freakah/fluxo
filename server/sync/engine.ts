@@ -175,7 +175,11 @@ export async function syncConnection(ctx: SyncCtx, connectionId: number, opts: {
   run(db, 'UPDATE connections SET last_attempt_at = ? WHERE id = ?', now.toISOString(), conn.id);
   if (!provider) return finish('failed', new ProviderError('not_configured', 'PROVIDER_UNAVAILABLE', `Provider "${conn.provider}" is not configured on this server`));
 
-  const ref = open(ctx.key, conn.provider_session_enc);
+  let ref: string;
+  try { ref = open(ctx.key, conn.provider_session_enc); } catch {
+    // Wrong or rotated DATA_ENCRYPTION_KEY: the stored bank session is unusable; the user must reconnect.
+    return finish('failed', new ProviderError('consent_expired', 'SESSION_UNREADABLE', 'Stored bank access could not be decrypted (encryption key changed). Reconnect.'));
+  }
   const accounts = all<Acct>(db, 'SELECT id, provider_account_uid, currency, synced_through, initial_sync_done, user_id FROM accounts WHERE connection_id = ? AND provider_account_uid IS NOT NULL', conn.id);
   const owner = randomUUID();
 

@@ -13,7 +13,7 @@ const RULES: [string, RegExp][] = [
   ['Slack/Stripe-style token', /\b(xox[abp]-[A-Za-z0-9-]{10,}|sk_live_[A-Za-z0-9]{10,})\b/],
   ['IBAN', /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){4,7}\b/],
   ['assigned secret', /\b(DATA_ENCRYPTION_KEY|ENABLE_BANKING_APP_ID|PASSWORD|SECRET|TOKEN)\s*=\s*['"]?[A-Za-z0-9+/=_-]{20,}/],
-  ['personal email', /\b[A-Za-z0-9._%+-]+@(?!example\.(?:com|org)|demo\.invalid|anthropic\.com|users\.noreply\.github\.com)[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/],
+  ['personal email', /\b[A-Za-z0-9._%+-]+@(?!example\.(?:com|org)|demo\.invalid|anthropic\.com|enablebanking\.com|users\.noreply\.github\.com)[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/],
 ];
 const ALLOW = [/^package-lock\.json$/, /^scripts\/scan-secrets\.ts$/];
 const BINARY_BAD = /\.(sqlite|db|sqlite-wal|sqlite-shm|pem|key|p12|pfx)$/i;
