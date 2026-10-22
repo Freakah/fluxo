@@ -12,9 +12,6 @@ import { createUser } from '../domain/lifecycle.ts';
 import { createDemoUser } from '../demo/seed.ts';
 
 const email = z.email().max(254).transform((e) => e.toLowerCase().trim());
-const loginLimiter = createLimiter(10, 15 * 60_000); // per IP
-const accountLimiter = createLimiter(5, 15 * 60_000); // per email
-const demoLimiter = createLimiter(20, 60 * 60_000);
 
 export function setSessionCookie(c: Context, deps: Deps, token: string, expiresAt: Date) {
   setCookie(c, SESSION_COOKIE, token, { httpOnly: true, sameSite: 'Lax', secure: deps.config.PUBLIC_URL.startsWith('https://'), path: '/', expires: expiresAt });
@@ -25,6 +22,9 @@ const totpFor = (secret: string, label: string) => new TOTP({ issuer: 'Fluxo', l
 export function authRoutes(deps: Deps) {
   const { db, config } = deps;
   const app = new Hono<Env>();
+  const loginLimiter = createLimiter(10, 15 * 60_000); // per IP
+  const accountLimiter = createLimiter(5, 15 * 60_000); // per email
+  const demoLimiter = createLimiter(20, 60 * 60_000);
   const ua = (c: Context) => c.req.header('user-agent') ?? null;
   const limit = (c: Context, limiter: ReturnType<typeof createLimiter>, key: string) => {
     const wait = limiter.take(key);

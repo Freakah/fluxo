@@ -14,7 +14,6 @@
     "dev:web": "vite --config web/vite.config.ts",
     "build": "vite build --config web/vite.config.ts",
     "start": "node --env-file-if-exists=.env server/index.ts",
-    "demo": "node --env-file-if-exists=.env scripts/demo.ts",
     "typecheck": "tsc -p tsconfig.json && tsc -p web/tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",

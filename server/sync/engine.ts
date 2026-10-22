@@ -136,7 +136,7 @@ export function applyStatement(db: DB, acct: Acct, txs: ProviderTx[], dateFrom: 
     if (seenIds.has(p.id) || p.claimed) continue;
     if (dateFrom && p.booking_date < dateFrom) continue;
     run(db, `UPDATE transactions SET status = 'cancelled', missing_since = COALESCE(missing_since, ?), missing_count = missing_count + 1,
-      needs_review = 'No longer reported as pending by the bank (expired authorisation, or posted under a reference we could not match).', updated_at = ? WHERE id = ?`, ts, ts, p.id);
+      needs_review = COALESCE(needs_review, 'No longer reported as pending by the bank (expired authorisation, or posted under a reference we could not match).'), updated_at = ? WHERE id = ?`, ts, ts, p.id);
     updated++;
   }
   return { inserted, updated };
