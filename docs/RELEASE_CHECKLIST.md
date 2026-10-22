@@ -13,9 +13,9 @@
 - [ ] Tag `vX.Y.Z`, GitHub release with changelog notes
 
 ## First publication (one-time)
-- [ ] Replace `[COPYRIGHT HOLDER — replace before publishing]` in `LICENSE`
-- [ ] Add a security contact or enable private vulnerability reporting (`SECURITY.md`)
-- [ ] Set `repository`, `homepage`, `bugs` and `author` in `package.json` (not set: unknown)
+- [x] Replace `[COPYRIGHT HOLDER — replace before publishing]` in `LICENSE`
+- [x] Add a security contact or enable private vulnerability reporting (`SECURITY.md`)
+- [x] Set `repository`, `homepage`, `bugs` and `author` in `package.json` (not set: unknown)
 - [ ] Review `docs/PRIVACY.md` wording; it is a template
 - [ ] Confirm no `data/`, `.env`, `*.pem`, `*.sqlite`, `test-results/` in `git ls-files`
 - [ ] Review git history for anything private (`git log -p | npm run scan:secrets` is not enough — inspect)

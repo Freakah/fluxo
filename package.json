@@ -5,6 +5,14 @@
   "description": "Self-hosted automatic expense tracker: connect a bank via open banking, sync transactions, understand spending.",
   "author": "Freakah",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Freakah/fluxo.git"
+  },
+  "homepage": "https://github.com/Freakah/fluxo#readme",
+  "bugs": {
+    "url": "https://github.com/Freakah/fluxo/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=24"
