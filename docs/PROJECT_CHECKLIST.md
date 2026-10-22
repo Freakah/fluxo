@@ -59,7 +59,7 @@ original task; this file tracks status.
 | Live mode without provider; first-user registration; backup + restore CLIs | pass (manual) |
 | Rendered UI inspected (desktop light/dark, mobile) | done; fixed contrast, mobile tables, mobile sign-out |
 | Enable Banking sandbox | NOT run (no credentials) |
-| Real Millennium bcp account | NOT run (requires user authorization) |
+| Real Millennium bcp account | First connection + initial import succeeded 2026-10-22 (via Pages relay; ~90 days of posted history). Re-sync dedup check pending |
 
 Status categories: verified with synthetic data = everything above; verified in provider sandbox = none; verified with real account = none; implemented awaiting external setup = Enable Banking live/sandbox connectivity.
 
@@ -69,7 +69,9 @@ Status categories: verified with synthetic data = everything above; verified in 
 - Enable Banking: production app "Fluxo (personal)" registered; app ID is in `.env`; key pair in `C:\Users\gusta\fluxo-keys` (private key never leaves that folder).
   Redirect URL registered: https://freakah.github.io/fluxo/callback.html (GitHub Pages relay from `docs/callback.html`, set as `BANK_REDIRECT_URL`).
   A real API call accepted the credentials; it returns "Application is not active" until accounts are linked.
-- Next: user activates the app ("Activate by linking accounts" → Millennium BCP, using the online-banking Código de Utilizador), creates the Fluxo login at http://localhost:3000, then Accounts → Connect a bank → Millennium BCP. First real end-to-end test still pending.
+- Done 2026-10-22: app activated (Active, restricted), Fluxo login created, Millennium BCP connected (180-day consent), initial import succeeded.
+- Next: manual "Sync now" to confirm no duplicates; compare last 30 days with the bank app; most real transactions are still Uncategorized → add rules / merchant list.
+- Previously: user activates the app ("Activate by linking accounts" → Millennium BCP, using the online-banking Código de Utilizador), creates the Fluxo login at http://localhost:3000, then Accounts → Connect a bank → Millennium BCP. First real end-to-end test still pending.
 
 ## External blockers
 - Enable Banking application (app id + private key) — user must register at enablebanking.com, upload a certificate, and link their own Millennium bcp account (restricted mode). Not available to the agent.
