@@ -83,7 +83,7 @@ Hosting on a server (HTTPS, reverse proxy, scheduler, backups): [docs/DEPLOYMENT
 
 - [Architecture & data flow](docs/ARCHITECTURE.md) · [Financial rules](docs/FINANCIAL_RULES.md) · [Sync](docs/SYNC.md)
 - [Provider setup](docs/PROVIDERS.md) · [Deployment](docs/DEPLOYMENT.md) · [Backup & restore](docs/BACKUP.md)
-- [Privacy & data lifecycle](docs/PRIVACY.md) · [Data export format](docs/DATA_EXPORT.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Privacy & data lifecycle](docs/PRIVACY.md) · [Terms of use](docs/TERMS.md) · [Data export format](docs/DATA_EXPORT.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Release checklist](docs/RELEASE_CHECKLIST.md) · [Dependencies](docs/DEPENDENCIES.md)
 
 ## Commands
