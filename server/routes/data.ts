@@ -14,6 +14,7 @@ import { normalizeMerchant } from '../domain/merchants.ts';
 
 const TYPES = ['expense', 'income', 'refund', 'transfer'] as const;
 const color = z.string().regex(/^#[0-9a-f]{6}$/i);
+const icon = z.string().regex(/^[a-z][a-z-]{0,23}$/); // icon name from the web app's icon set; unknown names fall back to a default
 
 export function dataRoutes(deps: Deps) {
   const { db } = deps;
@@ -131,24 +132,25 @@ export function dataRoutes(deps: Deps) {
   });
 
   // ---- Categories
-  app.get('/categories', (c) => c.json(all(db, `SELECT c.id, c.key, c.name, c.color, c.is_system, c.archived_at,
+  app.get('/categories', (c) => c.json(all(db, `SELECT c.id, c.key, c.name, c.color, c.icon, c.is_system, c.archived_at,
     (SELECT COUNT(*) FROM transactions t WHERE t.user_id = c.user_id AND COALESCE(t.category_override_id, t.auto_category_id) = c.id) AS tx_count
     FROM categories c WHERE c.user_id = ? ORDER BY c.archived_at IS NOT NULL, c.name`, uid(c))));
 
   app.post('/categories', async (c) => {
-    const b = await body(c, z.object({ name: z.string().trim().min(1).max(40), color: color.default('#607d8b') }));
+    const b = await body(c, z.object({ name: z.string().trim().min(1).max(40), color: color.default('#607d8b'), icon: icon.optional() }));
     if (get(db, 'SELECT 1 FROM categories WHERE user_id = ? AND name = ? COLLATE NOCASE AND archived_at IS NULL', uid(c), b.name)) throw new HttpError(409, 'A category with this name exists.');
-    return c.json({ id: run(db, 'INSERT INTO categories (user_id, name, color, created_at) VALUES (?,?,?,?)', uid(c), b.name, b.color, nowIso()).id });
+    return c.json({ id: run(db, 'INSERT INTO categories (user_id, name, color, icon, created_at) VALUES (?,?,?,?,?)', uid(c), b.name, b.color, b.icon ?? null, nowIso()).id });
   });
 
   app.patch('/categories/:id', async (c) => {
     const id = Number(c.req.param('id'));
-    const b = await body(c, z.object({ name: z.string().trim().min(1).max(40).optional(), color: color.optional(), archived: z.boolean().optional() }).strict());
+    const b = await body(c, z.object({ name: z.string().trim().min(1).max(40).optional(), color: color.optional(), icon: icon.nullable().optional(), archived: z.boolean().optional() }).strict());
     const cat = get<{ key: string | null }>(db, 'SELECT key FROM categories WHERE id = ? AND user_id = ?', id, uid(c));
     if (!cat) throw new HttpError(404, 'Category not found');
     if (b.archived && (cat.key === 'uncategorized' || cat.key === 'income')) throw new HttpError(400, 'This category is required and cannot be archived.');
     if (b.name !== undefined) run(db, 'UPDATE categories SET name = ? WHERE id = ?', b.name, id);
     if (b.color !== undefined) run(db, 'UPDATE categories SET color = ? WHERE id = ?', b.color, id);
+    if (b.icon !== undefined) run(db, 'UPDATE categories SET icon = ? WHERE id = ?', b.icon, id);
     // Archiving hides a category from pickers; historical transactions keep it.
     if (b.archived !== undefined) run(db, 'UPDATE categories SET archived_at = ? WHERE id = ?', b.archived ? nowIso() : null, id);
     return c.json({ ok: true });

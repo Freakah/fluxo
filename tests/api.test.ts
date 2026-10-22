@@ -202,6 +202,18 @@ describe('categorization through the API', () => {
     // Manual refresh cooldown
     expect((await c.post(`/api/connections/${id}/sync`)).status).toBe(429);
   });
+
+  it('stores a validated category icon and the onboarding flag', async () => {
+    const { app } = testApp();
+    const c = await registered(app, 'icons@example.com');
+    const made = await c.post('/api/categories', { name: 'Gym', color: '#2e7d32', icon: 'gym' });
+    expect(made.status).toBe(200);
+    expect((await c.patch(`/api/categories/${made.json.id}`, { icon: '<script>' })).status).toBe(400);
+    expect((await c.patch(`/api/categories/${made.json.id}`, { icon: 'pet' })).status).toBe(200);
+    expect((await c.get('/api/categories')).json.find((x: { id: number }) => x.id === made.json.id).icon).toBe('pet');
+    expect((await c.get('/api/session')).json.user.settings.onboarded).toBe(false);
+    expect((await c.put('/api/me/settings', { onboarded: true })).json.onboarded).toBe(true);
+  });
 });
 
 describe('exports', () => {

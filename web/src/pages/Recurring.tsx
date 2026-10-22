@@ -1,27 +1,48 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { ChevronLeft, ChevronRight, CalendarClock, CircleDashed, Receipt, Pencil, TriangleAlert } from 'lucide-react';
 import { api, useAction, useApi } from '../api.ts';
 import { m } from '../i18n.ts';
 import { useSession, useToast } from '../state.tsx';
-import { Badge, Card, Empty, ErrorBox, Loading, Money, Modal, Field, Help } from '../components/ui.tsx';
+import { Badge, Card, Empty, ErrorBox, Loading, Money, Modal, Field, PageHeader, Segmented } from '../components/ui.tsx';
+import { Monogram } from '../components/icons.tsx';
+import { addMonths, addDays, addMonthsToDate, monthBounds, monthOf, todayIn } from '../../../shared/dates.ts';
 import { minorToDecimal } from '../../../shared/money.ts';
 import type { Recurring } from '../types.ts';
 
 const TABS = ['suggested', 'confirmed', 'inactive', 'dismissed'] as const;
 const tabLabel: Record<string, string> = { suggested: m.recurring.suggested, confirmed: m.recurring.confirmed, inactive: m.recurring.inactiveL, dismissed: m.recurring.dismissed };
 
+/** Payment dates inside a month: projected forward from the next expected date, and back to the last real charge. */
+function datesIn(x: Recurring, month: string): string[] {
+  if (!x.next_date) return [];
+  const { from, to } = monthBounds(month);
+  const step = (d: string, dir: 1 | -1) => x.effective_frequency === 'weekly' ? addDays(d, 7 * dir) : addMonthsToDate(d, dir * (x.effective_frequency === 'quarterly' ? 3 : x.effective_frequency === 'annual' ? 12 : 1));
+  const out: string[] = [];
+  for (let d = x.next_date, i = 0; d <= to && i < 80; d = step(d, 1), i++) if (d >= from) out.push(d);
+  for (let d = step(x.next_date, -1), i = 0; d >= from && d >= x.last_date && i < 80; d = step(d, -1), i++) if (d <= to) out.push(d);
+  return out;
+}
+
 export function RecurringPage() {
   const { fmt, settings } = useSession();
   const toast = useToast();
   const r = useApi<Recurring[]>('/recurring');
+  const today = todayIn(settings.timezone);
   const [tab, setTab] = useState<(typeof TABS)[number]>('suggested');
   const [edit, setEdit] = useState<Recurring | null>(null);
+  const [month, setMonth] = useState(monthOf(today));
+  const [day, setDay] = useState<string | null>(null);
   const act = useAction();
-  if (r.error) return <ErrorBox error={r.error} onRetry={() => r.reload()} />;
-  if (!r.data) return <Loading />;
+  if (r.error) return <div className="page"><ErrorBox error={r.error} onRetry={() => r.reload()} /></div>;
+  if (!r.data) return <div className="page"><Loading rows={5} /></div>;
   const rows = r.data.filter((x) => x.status === tab);
   const confirmed = r.data.filter((x) => x.status === 'confirmed' && x.currency === settings.currency);
   const totalMonthly = confirmed.reduce((a, x) => a + x.monthly_equivalent_minor, 0);
+  const active = r.data.filter((x) => (x.status === 'confirmed' || x.status === 'suggested') && x.kind !== 'income');
+  const week = active.filter((x) => x.next_date && x.next_date >= today && x.next_date <= addDays(today, 7));
+  const byDay = new Map<string, Recurring[]>();
+  for (const x of active) for (const d of datesIn(x, month)) byDay.set(d, [...(byDay.get(d) ?? []), x]);
 
   const setStatus = (x: Recurring, status: string) => act.run(async () => {
     try {
@@ -31,43 +52,85 @@ export function RecurringPage() {
     } catch (e) { toast((e as Error).message, { kind: 'error' }); }
   });
 
+  const { from, days } = monthBounds(month);
+  const lead = (new Date(`${from}T00:00:00Z`).getUTCDay() + 6) % 7; // Monday-first calendar
+  const dayItems = day ? byDay.get(day) ?? [] : [];
+
   return (
     <div className="page">
-      <div className="page-head"><h1>{m.recurring.title}</h1></div>
-      <Help>{m.recurring.help}</Help>
-      <div className="tiles">
-        <div className="tile"><h2>{m.recurring.totalMonthly}</h2><p className="big">~<Money minor={totalMonthly} /></p><p className="help">{confirmed.length} confirmed · {m.common.estimate}</p></div>
+      <PageHeader title={m.recurring.title} subtitle="Subscriptions and bills that repeat, found automatically." info={m.recurring.help} />
+      <div className="stats">
+        <div className="stat"><span className="stat-icon accent"><Receipt size={22} aria-hidden="true" /></span><div><div className="stat-label">{m.recurring.totalMonthly}</div><div className="stat-value">~<Money minor={totalMonthly} /></div><small className="muted">{confirmed.length} confirmed · {m.common.estimate.toLowerCase()}</small></div></div>
+        <div className="stat"><span className="stat-icon warn"><CalendarClock size={22} aria-hidden="true" /></span><div><div className="stat-label">Due in the next 7 days</div><div className="stat-value">{week.length}</div><small className="muted">~<Money minor={week.reduce((a, x) => a + x.effective_amount_minor, 0)} /></small></div></div>
+        <button className="stat" style={{ cursor: 'pointer', textAlign: 'left' }} onClick={() => setTab('suggested')}><span className="stat-icon ok"><CircleDashed size={22} aria-hidden="true" /></span><div><div className="stat-label">Waiting for your review</div><div className="stat-value">{r.data.filter((x) => x.status === 'suggested').length}</div><small className="muted">Confirm or dismiss below</small></div></button>
       </div>
-      <div className="tabs" role="tablist" aria-label="Status">
-        {TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{tabLabel[t]} ({r.data!.filter((x) => x.status === t).length})</button>)}
-      </div>
-      <Card>
-        {!rows.length ? <Empty title={tab === 'suggested' && !r.data.length ? m.recurring.empty : 'Nothing here.'} /> : (
-          <div className="table-wrap">
-            <table className="table stack">
-              <caption className="sr-only">{tabLabel[tab]} recurring payments</caption>
-              <thead><tr><th scope="col">{m.tx.merchant}</th><th scope="col">{m.recurring.kind}</th><th scope="col">{m.recurring.frequency}</th><th scope="col" className="num">{m.recurring.typical}</th><th scope="col" className="num">{m.recurring.monthly}</th><th scope="col">{m.recurring.next}</th><th scope="col">{m.recurring.confidence}</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
-              <tbody>
-                {rows.map((x) => (
-                  <tr key={x.id}>
-                    <th scope="row"><Link to={`/transactions?q=${encodeURIComponent(x.merchant)}`}>{x.merchant}</Link>{x.possibly_ended && <><br /><Badge tone="warn" icon="!">{m.recurring.possiblyEnded}</Badge></>}</th>
-                    <td data-label={m.recurring.kind}>{m.kinds[x.kind]}</td>
-                    <td data-label={m.recurring.frequency}>{m.freqs[x.effective_frequency]}</td>
-                    <td className="num" data-label={m.recurring.typical}>~<Money minor={x.effective_amount_minor} currency={x.currency} />{x.max_amount_minor !== x.min_amount_minor && <><br /><small className="muted">{m.recurring.variable}: {fmt.money(x.min_amount_minor, x.currency)}–{fmt.money(x.max_amount_minor, x.currency)}</small></>}</td>
-                    <td className="num" data-label={m.recurring.monthly}>~<Money minor={x.monthly_equivalent_minor} currency={x.currency} /></td>
-                    <td data-label={m.recurring.next}>{x.next_date ? `~${fmt.date(x.next_date)}` : '—'}</td>
-                    <td data-label={m.recurring.confidence}><Badge tone={x.confidence === 'high' ? 'ok' : x.confidence === 'medium' ? 'info' : 'warn'}>{x.confidence}</Badge><br /><small className="muted">{x.occurrences}×, last {fmt.shortDate(x.last_date)}</small></td>
-                    <td className="actions">
-                      {x.status !== 'confirmed' && <button className="btn btn-small btn-primary" disabled={act.busy} onClick={() => setStatus(x, 'confirmed')}>{x.status === 'suggested' ? m.recurring.confirm : m.recurring.reactivate}</button>}
-                      {x.status === 'confirmed' && <button className="btn btn-small" disabled={act.busy} onClick={() => setStatus(x, 'inactive')}>{m.recurring.inactive}</button>}
-                      {x.status === 'suggested' && <button className="btn btn-small" disabled={act.busy} onClick={() => setStatus(x, 'dismissed')}>{m.recurring.dismiss}</button>}
-                      <button className="btn btn-small" onClick={() => setEdit(x)}>{m.common.edit}</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+      <div className="grid-2">
+        <Card title="Calendar" actions={
+          <div className="segmented" role="group" aria-label="Calendar month">
+            <button onClick={() => { setMonth(addMonths(month, -1)); setDay(null); }} aria-label="Previous month"><ChevronLeft size={18} aria-hidden="true" /></button>
+            <button className="on" tabIndex={-1} aria-live="polite">{fmt.month(month)}</button>
+            <button onClick={() => { setMonth(addMonths(month, 1)); setDay(null); }} aria-label="Next month"><ChevronRight size={18} aria-hidden="true" /></button>
+          </div>}>
+          <div className="cal-grid" role="group" aria-label={`Expected payments in ${fmt.month(month)}`}>
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => <div key={d} className="cal-dow" aria-hidden="true">{d}</div>)}
+            {Array.from({ length: lead }, (_, i) => <div key={`b${i}`} className="cal-day blank" aria-hidden="true" />)}
+            {Array.from({ length: days }, (_, i) => {
+              const d = addDays(from, i);
+              const items = byDay.get(d) ?? [];
+              return (
+                <button key={d} className={`cal-day ${d === today ? 'today' : ''} ${d === day ? 'sel' : ''}`} aria-pressed={d === day}
+                  aria-label={`${fmt.date(d)}${items.length ? `, ${items.length} expected payment${items.length > 1 ? 's' : ''}` : ''}`} onClick={() => setDay(d === day ? null : d)}>
+                  {i + 1}
+                  <span className="cal-dots" aria-hidden="true">{items.slice(0, 3).map((x) => <i key={x.id} className={d < today ? 'past' : undefined} />)}</span>
+                </button>
+              );
+            })}
           </div>
+        </Card>
+        <Card title={day ? fmt.date(day) : 'Next payments'}>
+          {(() => {
+            const list = day ? dayItems.map((x) => [day, x] as const) : active.filter((x) => x.next_date && x.next_date >= today).sort((a, b) => a.next_date!.localeCompare(b.next_date!)).slice(0, 7).map((x) => [x.next_date!, x] as const);
+            return list.length ? (
+              <ul className="list">
+                {list.map(([d, x]) => (
+                  <li key={`${d}-${x.id}`} className="item">
+                    <Monogram name={x.merchant} />
+                    <span className="item-text"><strong>{x.merchant}</strong><small className="muted">{d < today ? 'Paid' : '~'}{d < today ? ' ' : ''}{fmt.shortDate(d)} · {m.freqs[x.effective_frequency]}{x.status === 'suggested' ? ' · to review' : ''}</small></span>
+                    <span>~<Money minor={x.effective_amount_minor} currency={x.currency} /></span>
+                  </li>
+                ))}
+              </ul>
+            ) : <Empty art="calendar" title={day ? 'Nothing on this day' : 'No upcoming bills'} />;
+          })()}
+        </Card>
+      </div>
+
+      <Segmented label="Status" value={tab} onChange={setTab} options={TABS.map((t) => ({ value: t, label: `${tabLabel[t]} (${r.data!.filter((x) => x.status === t).length})` }))} />
+      <Card>
+        {!rows.length ? <Empty art={tab === 'suggested' ? 'done' : 'calendar'} title={tab === 'suggested' && !r.data.length ? m.recurring.empty : tab === 'suggested' ? 'All reviewed' : 'Nothing here'} /> : (
+          <ul className="rule-list" aria-label={`${tabLabel[tab]} bills`}>
+            {rows.map((x) => (
+              <li key={x.id} className="rule bill" aria-label={x.merchant}>
+                <Monogram name={x.merchant} size={44} />
+                <div className="item-text">
+                  <Link to={`/transactions?q=${encodeURIComponent(x.merchant)}`} className="item-title" style={{ color: 'inherit' }}>{x.merchant}</Link>
+                  <small className="muted">{m.kinds[x.kind]} · {m.freqs[x.effective_frequency]} · next ~{x.next_date ? fmt.date(x.next_date) : '—'} · seen {x.occurrences}×</small>
+                  {x.possibly_ended && <span><Badge tone="warn" icon={<TriangleAlert size={13} />}>{m.recurring.possiblyEnded}</Badge></span>}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <strong>~<Money minor={x.effective_amount_minor} currency={x.currency} /></strong>
+                  {x.max_amount_minor !== x.min_amount_minor && <small className="muted" style={{ display: 'block' }}>{m.recurring.variable}: {fmt.money(x.min_amount_minor, x.currency)}–{fmt.money(x.max_amount_minor, x.currency)}</small>}
+                </div>
+                <div className="row">
+                  {x.status !== 'confirmed' && <button className="btn btn-small btn-primary" disabled={act.busy} onClick={() => setStatus(x, 'confirmed')}>{x.status === 'suggested' ? m.recurring.confirm : m.recurring.reactivate}</button>}
+                  {x.status === 'confirmed' && <button className="btn btn-small" disabled={act.busy} onClick={() => setStatus(x, 'inactive')}>{m.recurring.inactive}</button>}
+                  {x.status === 'suggested' && <button className="btn btn-small" disabled={act.busy} onClick={() => setStatus(x, 'dismissed')}>{m.recurring.dismiss}</button>}
+                  <button className="icon-btn" onClick={() => setEdit(x)} aria-label={`Edit ${x.merchant}`}><Pencil size={17} aria-hidden="true" /></button>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
       {edit && <EditRecurring x={edit} onClose={(changed) => { setEdit(null); if (changed) void r.reload(true); }} />}

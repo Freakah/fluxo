@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
+import { Plus, RefreshCw, Link2, Unplug, Trash2, Pencil, ShieldCheck, KeyRound, CircleSlash, ChevronRight, Search, ArrowRight, Ellipsis, CircleCheck, TriangleAlert, Hourglass, CircleX } from 'lucide-react';
 import { api, useAction, useApi } from '../api.ts';
 import { m } from '../i18n.ts';
 import { useSession, useToast } from '../state.tsx';
-import { Badge, Card, Confirm, Empty, ErrorBox, Loading, Money, Modal, Help } from '../components/ui.tsx';
+import { Badge, Card, Confirm, Empty, ErrorBox, Loading, Money, Modal, PageHeader, Popover, Switch } from '../components/ui.tsx';
+import { Monogram } from '../components/icons.tsx';
+import { Art } from '../components/illustrations.tsx';
 import type { Account, Connection } from '../types.ts';
 
 const stateTone: Record<string, 'ok' | 'warn' | 'bad' | 'muted' | 'info'> = { active: 'ok', error: 'warn', expired: 'bad', revoked: 'bad', disconnected: 'muted', pending: 'info' };
-const stateIcon: Record<string, string> = { active: '✓', error: '!', expired: '✕', revoked: '✕', disconnected: '–', pending: '◷' };
+const stateIcon: Record<string, ReactNode> = { active: <CircleCheck size={13} />, error: <TriangleAlert size={13} />, expired: <CircleX size={13} />, revoked: <CircleX size={13} />, disconnected: <CircleSlash size={13} />, pending: <Hourglass size={13} /> };
 
 export function Accounts() {
   const { fmt, session } = useSession();
@@ -15,9 +18,11 @@ export function Accounts() {
   const [sp, setSp] = useSearchParams();
   const conns = useApi<Connection[]>('/connections');
   const accts = useApi<Account[]>('/accounts');
-  const [picker, setPicker] = useState<{ connectionId?: number } | null>(null);
+  const [picker, setPicker] = useState<{ connectionId?: number } | null>(() => (sp.get('connect') ? {} : null));
   const [disconnect, setDisconnect] = useState<Connection | null>(null);
   const [del, setDel] = useState<Connection | null>(null);
+  const [rename, setRename] = useState<Account | null>(null);
+  const [syncing, setSyncing] = useState<number | null>(null);
   const act = useAction();
 
   // Feedback after returning from the bank.
@@ -25,62 +30,85 @@ export function Accounts() {
     const err = sp.get('error'), ok = sp.get('connected');
     if (err) toast(m.accounts.errors[err] ?? m.errors.generic, { kind: 'error' });
     if (ok) { toast(m.accounts.connected); const t = setTimeout(() => { void conns.reload(true); void accts.reload(true); }, 2500); return () => clearTimeout(t); }
-    if (err || ok) setSp(new URLSearchParams(), { replace: true });
+    if (err || ok || sp.get('connect')) setSp(new URLSearchParams(), { replace: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reloadAll = async () => { await Promise.all([conns.reload(true), accts.reload(true)]); };
   const sync = (c: Connection) => act.run(async () => {
+    setSyncing(c.id);
     try {
       const r = await api<{ status: string; inserted: number; updated: number; message?: string }>(`/connections/${c.id}/sync`, { method: 'POST' });
-      toast(r.status === 'success' ? `Synced: ${r.inserted} new, ${r.updated} updated` : r.message ?? r.status, { kind: r.status === 'success' ? 'ok' : 'error' });
+      toast(r.status === 'success' ? `Up to date: ${r.inserted} new, ${r.updated} updated` : r.message ?? r.status, { kind: r.status === 'success' ? 'ok' : 'error' });
     } catch (e) { toast((e as Error).message, { kind: 'error' }); }
+    setSyncing(null);
     await reloadAll();
   });
   const patchAccount = (a: Account, body: Record<string, unknown>) => act.run(async () => {
     try { await api(`/accounts/${a.id}`, { method: 'PATCH', body }); await accts.reload(true); toast(m.common.saved); } catch (e) { toast((e as Error).message, { kind: 'error' }); }
   });
 
-  if (conns.error) return <ErrorBox error={conns.error} onRetry={() => conns.reload()} />;
-  if (!conns.data || !accts.data) return <Loading />;
+  const header = <PageHeader title={m.accounts.title} subtitle="The banks Fluxo reads from. Read-only: Fluxo can never move money."
+    actions={<button className="btn btn-primary" onClick={() => setPicker({})} disabled={!session?.provider}><Plus size={18} aria-hidden="true" />{m.accounts.connect}</button>} />;
+  if (conns.error) return <div className="page">{header}<ErrorBox error={conns.error} onRetry={() => conns.reload()} /></div>;
+  if (!conns.data || !accts.data) return <div className="page">{header}<Loading rows={5} /></div>;
   const manual = accts.data.filter((a) => a.connection_id === null);
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{m.accounts.title}</h1>
-        <button className="btn btn-primary" onClick={() => setPicker({})} disabled={!session?.provider}>{m.accounts.connect}</button>
-      </div>
-      {!session?.provider && <div className="alert alert-warn" role="note">{m.accounts.noProvider}</div>}
+      {header}
+      {!session?.provider && <div className="alert alert-warn" role="note"><TriangleAlert size={18} aria-hidden="true" />{m.accounts.noProvider}</div>}
       {session?.provider && !session.provider.live && session.mode === 'live' && <div className="alert alert-info" role="note">Provider: {session.provider.label}. Sandbox connections return test data from the provider, not your real bank.</div>}
 
-      {!conns.data.length && <Card><Empty title={m.dashboard.empty}><p>{m.dashboard.emptyHelp}</p></Empty></Card>}
+      {!conns.data.length && <Card><Empty art="bank" title={m.dashboard.empty} action={session?.provider && <button className="btn btn-primary" onClick={() => setPicker({})}><Plus size={18} aria-hidden="true" />{m.accounts.connect}</button>}>{m.dashboard.emptyHelp}</Empty></Card>}
       {conns.data.map((c) => {
         const accounts = accts.data!.filter((a) => a.connection_id === c.id);
         return (
-          <Card key={c.id} title={<>{c.institution_name} <Badge tone={stateTone[c.status] ?? 'muted'} icon={stateIcon[c.status]}>{m.accounts.states[c.status] ?? c.status}</Badge> {c.simulated ? <Badge tone="info">{m.accounts.simulated}</Badge> : c.live ? <Badge tone="ok">{m.accounts.live}</Badge> : <Badge tone="info">{m.accounts.sandbox}</Badge>}</>}
-            actions={<>
-              {['active', 'error'].includes(c.status) && <button className="btn btn-small" disabled={act.busy} onClick={() => sync(c)}>{act.busy ? m.common.loading : m.accounts.sync}</button>}
-              {['expired', 'revoked', 'error', 'disconnected'].includes(c.status) && <button className="btn btn-small btn-primary" onClick={() => setPicker({ connectionId: c.id })}>{m.accounts.reconnect}</button>}
-              {c.status !== 'disconnected' && <button className="btn btn-small" onClick={() => setDisconnect(c)}>{m.accounts.disconnect}</button>}
-              {c.status === 'disconnected' && <button className="btn btn-small btn-danger" onClick={() => setDel(c)}>{m.accounts.deleteData}</button>}
-            </>}>
-            {c.last_error_message && c.status !== 'active' && <div className={`alert ${c.status === 'error' ? 'alert-warn' : 'alert-error'}`} role="status">{c.last_error_message}</div>}
-            <dl className="facts compact">
-              <dt>{m.accounts.lastSuccess}</dt><dd>{fmt.dateTime(c.last_success_at)} <small className="muted">({fmt.ago(c.last_success_at)})</small></dd>
-              <dt>{m.accounts.lastAttempt}</dt><dd>{fmt.dateTime(c.last_attempt_at)}</dd>
-              <dt>{m.accounts.consent}</dt><dd>{c.consent_expires_at ? fmt.dateTime(c.consent_expires_at) : 'Unknown'}</dd>
-              {c.next_sync_after && ['active', 'error'].includes(c.status) && <><dt>Next automatic sync</dt><dd>after {fmt.dateTime(c.next_sync_after)}</dd></>}
-            </dl>
-            {c.recentRuns.length > 0 && <details><summary>Recent sync runs</summary><ul className="list small">{c.recentRuns.map((r, i) => <li key={i}>{fmt.dateTime(r.started_at)} — {r.status}{r.error_code ? ` (${r.error_code})` : ''}: {r.inserted} new, {r.updated} updated</li>)}</ul></details>}
-            <AccountRows accounts={accounts} onPatch={patchAccount} />
-          </Card>
+          <section key={c.id} className="card conn-card" aria-labelledby={`conn-${c.id}`}>
+            <div className="conn-head">
+              <Monogram name={c.institution_name} size={48} />
+              <div className="conn-title">
+                <h2 id={`conn-${c.id}`}>{c.institution_name}</h2>
+                <div className="row">
+                  <Badge tone={stateTone[c.status] ?? 'muted'} icon={stateIcon[c.status]}>{m.accounts.states[c.status] ?? c.status}</Badge>
+                  {c.simulated ? <Badge tone="info">{m.accounts.simulated}</Badge> : c.live ? <Badge tone="ok">{m.accounts.live}</Badge> : <Badge tone="info">{m.accounts.sandbox}</Badge>}
+                  <small className="muted">Updated {fmt.ago(c.last_success_at)}</small>
+                </div>
+              </div>
+              <div className="row">
+                {['active', 'error'].includes(c.status) && <button className="btn" disabled={act.busy} onClick={() => sync(c)}><RefreshCw size={17} aria-hidden="true" className={syncing === c.id ? 'spin' : undefined} />{syncing === c.id ? 'Syncing…' : m.accounts.sync}</button>}
+                {['expired', 'revoked', 'error', 'disconnected'].includes(c.status) && <button className="btn btn-primary" onClick={() => setPicker({ connectionId: c.id })}><Link2 size={17} aria-hidden="true" />{m.accounts.reconnect}</button>}
+                <Popover label={`More actions for ${c.institution_name}`} button={<Ellipsis size={20} aria-hidden="true" />}>
+                  {(close) => <>
+                    {c.status !== 'disconnected' && <button className="menu-item" onClick={() => { close(); setDisconnect(c); }}><Unplug size={18} aria-hidden="true" />{m.accounts.disconnect}</button>}
+                    {c.status === 'disconnected' && <button className="menu-item danger" onClick={() => { close(); setDel(c); }}><Trash2 size={18} aria-hidden="true" />{m.accounts.deleteData}</button>}
+                  </>}
+                </Popover>
+              </div>
+            </div>
+            {c.last_error_message && c.status !== 'active' && <div className={`alert ${c.status === 'error' ? 'alert-warn' : 'alert-error'}`} role="status"><TriangleAlert size={18} aria-hidden="true" />{c.last_error_message}</div>}
+            <AccountCards accounts={accounts} onPatch={patchAccount} onRename={setRename} />
+            <details className="disclosure">
+              <summary>Connection details</summary>
+              <dl className="facts">
+                <dt>{m.accounts.lastSuccess}</dt><dd>{fmt.dateTime(c.last_success_at)} <small className="muted">({fmt.ago(c.last_success_at)})</small></dd>
+                <dt>{m.accounts.lastAttempt}</dt><dd>{fmt.dateTime(c.last_attempt_at)}</dd>
+                <dt>{m.accounts.consent}</dt><dd>{c.consent_expires_at ? fmt.dateTime(c.consent_expires_at) : 'Unknown'}</dd>
+                {c.next_sync_after && ['active', 'error'].includes(c.status) && <><dt>Next automatic sync</dt><dd>after {fmt.dateTime(c.next_sync_after)}</dd></>}
+              </dl>
+              {c.recentRuns.length > 0 && <><h3 className="section-title">Recent syncs</h3><ul className="list small">{c.recentRuns.map((r, i) => <li key={i} className="list-row"><span>{fmt.dateTime(r.started_at)}</span><span>{r.status}{r.error_code ? ` (${r.error_code})` : ''} · {r.inserted} new, {r.updated} updated</span></li>)}</ul></>}
+            </details>
+          </section>
         );
       })}
-      {manual.length > 0 && <Card title={m.accounts.manualAccount}><AccountRows accounts={manual} onPatch={patchAccount} /></Card>}
+      {manual.length > 0 && <Card title={m.accounts.manualAccount}><AccountCards accounts={manual} onPatch={patchAccount} onRename={setRename} /></Card>}
 
-      <Card title={m.accounts.coverage}><ul className="bullets">{m.accounts.coverageText.map((t) => <li key={t}>{t}</li>)}</ul></Card>
+      <details className="disclosure">
+        <summary><ShieldCheck size={18} aria-hidden="true" />{m.accounts.coverage}</summary>
+        <ul className="bullets">{m.accounts.coverageText.map((t) => <li key={t}>{t}</li>)}</ul>
+      </details>
 
-      {picker && <BankPicker connectionId={picker.connectionId} onClose={() => setPicker(null)} />}
+      {picker && <ConnectWizard connectionId={picker.connectionId} onClose={() => setPicker(null)} />}
+      {rename && <RenameAccount a={rename} onClose={() => setRename(null)} onSave={(n) => { patchAccount(rename, { display_name: n || null }); setRename(null); }} />}
       <Confirm open={!!disconnect} title={`${m.accounts.disconnect} ${disconnect?.institution_name ?? ''}?`} text={m.accounts.disconnectConfirm} confirmLabel={m.accounts.disconnect} busy={act.busy}
         onClose={() => setDisconnect(null)} onConfirm={() => act.run(async () => {
           try { const r = await api<{ providerRevoked: boolean }>(`/connections/${disconnect!.id}/disconnect`, { method: 'POST' }); toast(r.providerRevoked ? 'Disconnected. Provider access ended.' : 'Disconnected locally. The provider could not confirm revocation — also revoke access in your bank app.'); } catch (e) { toast((e as Error).message, { kind: 'error' }); }
@@ -95,55 +123,96 @@ export function Accounts() {
   );
 }
 
-function AccountRows({ accounts, onPatch }: { accounts: Account[]; onPatch: (a: Account, b: Record<string, unknown>) => void }) {
+function AccountCards({ accounts, onPatch, onRename }: { accounts: Account[]; onPatch: (a: Account, b: Record<string, unknown>) => void; onRename: (a: Account) => void }) {
   const { fmt } = useSession();
   return (
-    <ul className="list">
-      {accounts.map((a) => (
-        <li key={a.id} className="list-row">
-          <span>
-            <strong>{a.display_name ?? a.name}</strong> <small className="muted">{a.kind}{a.iban_last4 ? ` ·••${a.iban_last4}` : ''} · {a.currency} · {a.tx_count} transactions{a.latest_tx_date ? `, latest ${fmt.date(a.latest_tx_date)}` : ''}</small><br />
-            <small className="muted">{a.balance_label ? `${a.balance_label}, reported ${fmt.dateTime(a.balance_at)}` : m.dashboard.noBalance}</small>
-          </span>
-          <span className="row">
-            <Money minor={a.balance_minor} currency={a.currency} />
-            <label className="switch"><input type="checkbox" checked={!!a.included} onChange={(e) => onPatch(a, { included: e.target.checked })} /> {m.accounts.include}</label>
-            <button className="link" onClick={() => { const n = prompt('Display name (empty to reset)', a.display_name ?? a.name); if (n !== null) onPatch(a, { display_name: n.trim() || null }); }}>Rename</button>
-          </span>
-        </li>
+    <div className="acct-cards">
+      {accounts.map((a, i) => (
+        <article key={a.id} className={`acct-card ${['', 'alt1', 'alt2', 'alt3'][i % 4]} ${a.included ? '' : 'excluded'}`} aria-label={a.display_name ?? a.name}>
+          <div className="acct-card-top">
+            <div><strong>{a.display_name ?? a.name}</strong><br /><small>{a.kind}{a.iban_last4 ? ` · •••• ${a.iban_last4}` : ''} · {a.currency}</small></div>
+            <button className="icon-btn" onClick={() => onRename(a)} aria-label={`Rename ${a.display_name ?? a.name}`}><Pencil size={17} aria-hidden="true" /></button>
+          </div>
+          <div>
+            <div className="acct-balance"><Money minor={a.balance_minor} currency={a.currency} /></div>
+            <small>{a.balance_label ? `${a.balance_label} · ${fmt.ago(a.balance_at)}` : m.dashboard.noBalance}</small>
+          </div>
+          <div className="acct-card-foot">
+            <small>{a.tx_count} transactions</small>
+            <Switch checked={!!a.included} onChange={(v) => onPatch(a, { included: v })} label={<small>{m.accounts.include}</small>} />
+          </div>
+        </article>
       ))}
-    </ul>
+    </div>
   );
 }
 
-function BankPicker({ connectionId, onClose }: { connectionId?: number; onClose: () => void }) {
+function RenameAccount({ a, onClose, onSave }: { a: Account; onClose: () => void; onSave: (name: string) => void }) {
+  const [n, setN] = useState(a.display_name ?? a.name);
+  return (
+    <Modal open title="Rename account" onClose={onClose} footer={<><button className="btn" onClick={onClose}>{m.common.cancel}</button><button className="btn btn-primary" onClick={() => onSave(n.trim())}>{m.common.save}</button></>}>
+      <div className="field"><label htmlFor="acct-name">Name shown in Fluxo</label><input id="acct-name" data-autofocus maxLength={60} value={n} onChange={(e) => setN(e.target.value)} /><small className="hint">Leave empty to use the bank’s name ({a.name}).</small></div>
+    </Modal>
+  );
+}
+
+/** Three steps with pictures: what happens → choose bank → hand-off to the bank. */
+function ConnectWizard({ connectionId, onClose }: { connectionId?: number; onClose: () => void }) {
   const toast = useToast();
+  const [step, setStep] = useState<0 | 1 | 2>(connectionId ? 1 : 0);
   const [country, setCountry] = useState('PT');
   const [filter, setFilter] = useState('');
-  const list = useApi<{ provider: string; live: boolean; institutions: { name: string; country: string }[] }>(`/institutions?country=${country}`);
+  const [bank, setBank] = useState<string | null>(null);
+  const list = useApi<{ provider: string; live: boolean; institutions: { name: string; country: string }[] }>(step >= 1 ? `/institutions?country=${country}` : null);
   const { busy, run } = useAction();
-  const start = (name: string) => run(async () => {
+  const start = () => run(async () => {
     try {
-      const { url } = await api<{ url: string }>('/connections/start', { method: 'POST', body: { institution: name, country, connectionId } });
+      const { url } = await api<{ url: string }>('/connections/start', { method: 'POST', body: { institution: bank, country, connectionId } });
       window.location.assign(url);
     } catch (e) { toast((e as Error).message, { kind: 'error' }); }
   });
   const items = (list.data?.institutions ?? []).filter((i) => i.name.toLowerCase().includes(filter.toLowerCase()));
+  const Bank = Art.bank, Shield = Art.shield;
   return (
-    <Modal open title={connectionId ? m.accounts.reconnect : m.accounts.chooseBank} onClose={onClose}>
-      <Help>{m.accounts.redirectNote}</Help>
-      <div className="row">
-        <label htmlFor="country">Country</label>
-        <select id="country" value={country} onChange={(e) => setCountry(e.target.value)}>{['PT', 'ES', 'FR', 'DE', 'IT', 'NL', 'BE', 'IE', 'FI', 'SE'].map((c) => <option key={c}>{c}</option>)}</select>
-        <label className="sr-only" htmlFor="bankq">Search banks</label>
-        <input id="bankq" type="search" placeholder="Search banks" value={filter} onChange={(e) => setFilter(e.target.value)} />
-      </div>
-      {list.error && <ErrorBox error={list.error} onRetry={() => list.reload()} />}
-      {list.loading && <Loading />}
-      {list.data && (items.length ? (
-        <ul className="list bank-list">{items.map((i) => <li key={i.name}><button className="btn bank-btn" disabled={busy} onClick={() => start(i.name)}>{i.name}</button></li>)}</ul>
-      ) : <Empty title="No banks found." />)}
-      {list.data && <p className="help">Via {list.data.provider}. Read-only access to accounts, balances and transactions.</p>}
+    <Modal open title={connectionId ? m.accounts.reconnect : m.accounts.connect} onClose={onClose} footer={<>
+      {step > (connectionId ? 1 : 0) && <button className="btn" onClick={() => setStep((step - 1) as 0 | 1)}>{m.common.back}</button>}
+      <span className="spacer" />
+      {step === 0 && <button className="btn btn-primary" onClick={() => setStep(1)}>Continue<ArrowRight size={18} aria-hidden="true" /></button>}
+      {step === 2 && <button className="btn btn-primary" disabled={busy} onClick={start}>{busy ? m.common.loading : `Continue to ${bank}`}<ArrowRight size={18} aria-hidden="true" /></button>}
+    </>}>
+      <div className="steps-dots" role="img" aria-label={`Step ${step + 1} of 3`}>{[0, 1, 2].map((k) => <span key={k} className={k === step ? 'on' : ''} />)}</div>
+      {step === 0 && (
+        <div className="stack">
+          <div className="wizard-art"><Bank /></div>
+          <ul className="feature-list">
+            <li><span className="stat-icon ok"><ShieldCheck size={20} aria-hidden="true" /></span><div><strong>Read-only</strong><br /><small className="muted">Fluxo can see balances and transactions. It cannot make payments.</small></div></li>
+            <li><span className="stat-icon accent"><KeyRound size={20} aria-hidden="true" /></span><div><strong>Your password stays with your bank</strong><br /><small className="muted">You sign in on your bank’s own page. Fluxo never sees your login or codes.</small></div></li>
+            <li><span className="stat-icon warn"><Unplug size={20} aria-hidden="true" /></span><div><strong>Disconnect at any time</strong><br /><small className="muted">Here in Fluxo, or in your bank’s app.</small></div></li>
+          </ul>
+        </div>
+      )}
+      {step === 1 && <>
+        <p className="lede">{m.accounts.chooseBank}</p>
+        <div className="toolbar">
+          <label className="sr-only" htmlFor="country">Country</label>
+          <select id="country" className="chip-select" value={country} onChange={(e) => setCountry(e.target.value)}>{['PT', 'ES', 'FR', 'DE', 'IT', 'NL', 'BE', 'IE', 'FI', 'SE'].map((c) => <option key={c}>{c}</option>)}</select>
+          <div className="search-box"><Search size={18} aria-hidden="true" /><label className="sr-only" htmlFor="bankq">Search banks</label><input id="bankq" type="search" placeholder="Search banks" value={filter} onChange={(e) => setFilter(e.target.value)} /></div>
+        </div>
+        {list.error && <ErrorBox error={list.error} onRetry={() => list.reload()} />}
+        {list.loading && <Loading />}
+        {list.data && (items.length ? (
+          <ul className="bank-list">{items.map((i) => <li key={i.name}><button className="bank-btn" onClick={() => { setBank(i.name); setStep(2); }}><Monogram name={i.name} size={36} />{i.name}<ChevronRight size={18} aria-hidden="true" /></button></li>)}</ul>
+        ) : <Empty art="search" title="No banks found" />)}
+        {list.data && <p className="help">Via {list.data.provider}. Read-only access to accounts, balances and transactions.</p>}
+      </>}
+      {step === 2 && bank && (
+        <div className="welcome">
+          <div className="wizard-art"><Shield /></div>
+          <h3>Next: approve at {bank}</h3>
+          <p>{m.accounts.redirectNote}</p>
+          <p className="muted small">When you are done, you come straight back here and your transactions start importing.</p>
+        </div>
+      )}
     </Modal>
   );
 }

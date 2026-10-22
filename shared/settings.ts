@@ -7,6 +7,7 @@ export type Settings = {
   hideAmounts: boolean;
   budgetThresholds: number[];
   notify: { budget: boolean; sync: boolean; consent: boolean; recurring: boolean };
+  onboarded: boolean; // first-run welcome seen
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -17,6 +18,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideAmounts: false,
   budgetThresholds: [80, 100],
   notify: { budget: true, sync: true, consent: true, recurring: true },
+  onboarded: false,
 };
 
 export function mergeSettings(raw: unknown): Settings {
