@@ -19,8 +19,10 @@ const SUFFIX_NOISE = /\b(lda|sa|s\.a\.|unipessoal|lisboa|porto|pt|prt|portugal|e
 /** "COMPRA 4521 CONTINENTE MODELO LISBOA" -> "Continente Modelo". Display-oriented, never stored over the raw description. */
 export function normalizeMerchant(description: string, counterparty?: string | null): string {
   const base = (counterparty && counterparty.trim()) || description;
-  const mb = /^mb ?way\s+(p\/|para|de)\s*(.+)$/i.exec(base.trim());
+  const mb = /^(?:trf\.?\s+)?mb ?way\s+(p\/|(?:para|de|p)\b)\s*(.+)$/i.exec(base.trim());
   if (mb) return `MB WAY ${/^de$/i.test(mb[1]) ? 'from' : 'to'} ${mb[2].trim()}`;
+  const from = /^trf\.?\s+p\.? ?o\.?\s+(.+)$/i.exec(base.trim()); // Millennium "TRF. P O <name>": incoming, "por ordem de"
+  if (from) return `Transfer from ${from[1].trim()}`;
   const ent = /^pag(?:amento)?\.? serv(?:i[cç]os)?\.?\s+ent(?:idade)?\.?\s*(\d{5})/i.exec(base.trim());
   if (ent) return `Payment to entity ${ent[1]}`; // Multibanco service payment: the entity number identifies the payee
   let s = base.replace(/\s+/g, ' ').trim();
@@ -56,13 +58,14 @@ export const KNOWN_MERCHANTS: Known[] = [
   K('Metro de Lisboa', 'metro(politano)? (de )?lisboa', 'transport'),
   K('CP Comboios', 'cp comboios|comboios de portugal', 'transport'),
   K('Carris', 'carris', 'transport'),
+  // Food delivery first: "UBER EATS HELP.UBER.COM" also contains a bare "uber".
+  K('Uber Eats', 'uber ?eats', 'restaurants'),
+  K('Bolt Food', 'bolt ?food', 'restaurants'),
   K('Uber', 'uber(?! ?eats)', 'transport'),
   K('Bolt', 'bolt(?! ?food)', 'transport'),
-  K('Via Verde', 'via verde', 'transport'),
-  K('Uber Eats', 'uber ?eats', 'restaurants'),
+  K('Via Verde', 'via ?verde', 'transport'),
   K('Glovo', 'glovo', 'restaurants'),
-  K('Bolt Food', 'bolt ?food', 'restaurants'),
-  K("McDonald's", 'mc ?donald\'?s', 'restaurants'),
+  K("McDonald's", 'mc ?donal ?d\'?s?', 'restaurants'),
   K('Telepizza', 'telepizza', 'restaurants'),
   K('Starbucks', 'starbucks', 'restaurants'),
   K('Padaria Portuguesa', 'padaria portuguesa', 'restaurants'),
@@ -79,7 +82,9 @@ export const KNOWN_MERCHANTS: Known[] = [
   K('Disney+', 'disney ?plus|disney\\+', 'subscriptions'),
   K('HBO Max', 'hbo ?max|max\\.com', 'subscriptions'),
   K('Amazon Prime', 'amazon prime|prime video', 'subscriptions'),
-  K('Apple', 'apple\\.com/bill|itunes', 'subscriptions'),
+  K('Apple', 'apple\\.com[/ ]bill|itunes', 'subscriptions'),
+  K('Anthropic', 'anthropic', 'subscriptions'),
+  K('OpenAI', 'openai|chatgpt', 'subscriptions'),
   K('Google Play', 'google ?play', 'subscriptions'),
   K('Steam', 'steam(games|powered)?', 'entertainment'),
   K('PlayStation Plus', 'playstation plus|ps plus', 'subscriptions'),
@@ -88,6 +93,8 @@ export const KNOWN_MERCHANTS: Known[] = [
   K('Xbox', 'xbox|microsoft\\*xbox', 'entertainment'),
   K('Epic Games', 'epic games', 'entertainment'),
   K('Cinemas NOS', 'cinemas nos', 'entertainment'),
+  K('3cket', '3cket', 'entertainment'),
+  K('Ticketline', 'ticketline', 'entertainment'),
   K('Worten', 'worten', 'shopping'),
   K('FNAC', 'fnac', 'shopping'),
   K('IKEA', 'ikea', 'shopping'),
@@ -105,6 +112,7 @@ export const KNOWN_MERCHANTS: Known[] = [
   K('easyJet', 'easyjet', 'travel'),
   K('Booking.com', 'booking\\.com', 'travel'),
   K('Airbnb', 'airbnb', 'travel'),
+  K('UK Visas (ETA)', 'ukvi', 'travel'),
   K('Udemy', 'udemy', 'education'),
   K('Coursera', 'coursera', 'education'),
   K('Bertrand', 'bertrand', 'education'),
@@ -115,15 +123,16 @@ export function matchKnownMerchant(text: string): Known | undefined {
 }
 
 // Processors/wallets: the description alone does not identify what was bought.
-export const AMBIGUOUS = /\b(paypal|mb ?way|sumup|stripe|revolut|adyen|klarna|wise|zettle)\b/i;
+export const AMBIGUOUS = /\b(paypal|mb ?way|sumup|stripe|revolut|adyen|klarna|wise|zettle|hipay)\b/i;
 
 // Conservative description keywords (Portuguese bank wording). Lower confidence than merchant mappings.
 export const DESCRIPTION_RULES: { re: RegExp; category: CategoryKey; direction?: 'in' | 'out' }[] = [
-  { re: /\b(comiss[aã]o|comissoes|manuten[cç][aã]o de conta|imposto (do )?selo|despesas de manuten)\b/i, category: 'bank_fees', direction: 'out' },
+  { re: /\b(comiss[aã]o|comissoes|manuten[cç][aã]o de conta|com\.? ?man\.? ?conta|custo de servi[cç]o|imposto (do )?selo|despesas de manuten)\b/i, category: 'bank_fees', direction: 'out' },
   { re: /\b(lev(antamento)?\.? (atm|multibanco)|levantamento|atm withdrawal)\b/i, category: 'cash', direction: 'out' },
   { re: /\b(renda|condom[ií]nio|presta[cç][aã]o habita[cç][aã]o)\b/i, category: 'housing', direction: 'out' },
   { re: /\b(sal[aá]rio|vencimento|ordenado|payroll)\b/i, category: 'income', direction: 'in' },
-  { re: /\b(restaurante|pastelaria|caf[eé]|snack[- ]bar|cervejaria|tasca|marisqueira)\b/i, category: 'restaurants', direction: 'out' },
+  { re: /\b(restaurante|pastelaria|caf[eé]|snack[- ]bar|bar|cervejaria|tasca|marisqueira|pizzaria|burger\w*|sushi)\b/i, category: 'restaurants', direction: 'out' },
+  { re: /\b(est\.? servi[cç]o|esta[cç][aã]o de servi[cç]o|posto de abastecimento)\b/i, category: 'fuel', direction: 'out' },
   { re: /\b(supermercado|mercearia|talho|frutaria)\b/i, category: 'groceries', direction: 'out' },
   { re: /\b(parque|estacionamento|portagem|parking)\b/i, category: 'transport', direction: 'out' },
   { re: /\b(hotel|hostel|alojamento)\b/i, category: 'travel', direction: 'out' },

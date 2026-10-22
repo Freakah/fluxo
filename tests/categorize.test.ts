@@ -50,4 +50,20 @@ describe('categorization precedence', () => {
     expect(normalizeMerchant('MBWAY P/ 912***523')).toBe('MB WAY to 912***523');
     expect(normalizeMerchant('COMPRA 4521 LOJA DO BAIRRO UNIP')).toBe('Loja Do Bairro Unip');
   });
+  it('handles Millennium bcp statement wording', () => {
+    expect(normalizeMerchant('TRF MB WAY P  ANA SILVA')).toBe('MB WAY to ANA SILVA');
+    expect(normalizeMerchant('TRF MB WAY DE  ANA SILVA')).toBe('MB WAY from ANA SILVA');
+    expect(normalizeMerchant('MB WAY PEDRO')).not.toMatch(/^MB WAY to/);
+    expect(normalizeMerchant('TRF. P O JOAO SOUSA')).toBe('Transfer from JOAO SOUSA');
+    expect(classify(t('COMPRA 1234 UBER EATS HELP.UBER.COMNH'), [], cat).categoryId).toBe(cat('restaurants'));
+    expect(classify(t('COMPRA 1234 MCDONAL D VILA DO COPORTO'), [], cat).categoryId).toBe(cat('restaurants'));
+    expect(classify(t('COMPRA 1234 APPLE.COM BILL CORK IR'), [], cat).categoryId).toBe(cat('subscriptions'));
+    expect(classify(t('PAG BXVAL- 1234 VIAVERDE'), [], cat).categoryId).toBe(cat('transport'));
+    expect(classify(t('COMPRA 1234 EST SERVICO POSTO XPTO'), [], cat).categoryId).toBe(cat('fuel'));
+    expect(classify(t('COMPRA 1234 XPTO BURGERSPORTO'), [], cat).categoryId).toBe(cat('restaurants'));
+    expect(classify(t('COMPRA 1234 BARBEARIA XPTO'), [], cat).categoryId).toBe(cat('uncategorized'));
+    for (const d of ['COM.MAN.CONTA PACOTE MILLENNIUM GO 072026', 'CUSTO DE SERVICO INTERNACIONAL', 'COMISSAO TRF MBWAY 10.00 APP MB WAY'])
+      expect(classify(t(d), [], cat).categoryId).toBe(cat('bank_fees'));
+    expect(classify(t('COMPRA 1234 HIPAY LEVALLOIS-PERRET'), [], cat).categoryId).toBe(cat('uncategorized'));
+  });
 });
