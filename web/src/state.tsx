@@ -4,6 +4,7 @@ import { api, useApi } from './api.ts';
 import type { Category } from './types.ts';
 import { makeFormat, type Format } from './format.ts';
 import { DEFAULT_SETTINGS, type Settings } from '../../shared/settings.ts';
+import { initialLanguage, rememberLanguage, setLanguage, type Lang } from './i18n.ts';
 
 export type Session = {
   mode: 'demo' | 'live'; version: string; registrationOpen: boolean; mfaPending?: boolean;
@@ -11,7 +12,7 @@ export type Session = {
   user: null | { email: string; isDemo: boolean; totpEnabled: boolean; createdAt: string; settings: Settings };
 };
 
-type Ctx = { session: Session | null; refresh: () => Promise<void>; settings: Settings; fmt: Format; updateSettings: (p: Partial<Settings>) => Promise<void> };
+type Ctx = { session: Session | null; refresh: () => Promise<void>; settings: Settings; fmt: Format; updateSettings: (p: Partial<Settings>) => Promise<void>; lang: Lang; setDeviceLanguage: (l: Lang) => void };
 const SessionCtx = createContext<Ctx | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -24,6 +25,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('fluxo:unauthorized', onUnauth);
   }, [refresh]);
   const settings = session?.user?.settings ?? DEFAULT_SETTINGS;
+  const [deviceLang, setDeviceLang] = useState<Lang>(initialLanguage);
+  const lang = settings.language ?? deviceLang;
+  setLanguage(lang); // synchronous, before children render; a no-op when unchanged
+  useEffect(() => rememberLanguage(lang), [lang]);
+  // First sign-in on this account: keep the language this device was using (also renames default categories).
+  const signedIn = !!session?.user;
+  useEffect(() => { if (signedIn && settings.language === null) void updateSettingsRef.current({ language: deviceLang }).catch(() => undefined); }, [signedIn, settings.language, deviceLang]);
+  const updateSettingsRef = useRef<(p: Partial<Settings>) => Promise<void>>(async () => undefined);
+  const setDeviceLanguage = useCallback((l: Lang) => { rememberLanguage(l); setDeviceLang(l); }, []);
   useEffect(() => {
     const root = document.documentElement;
     if (settings.theme === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', settings.theme);
@@ -33,8 +43,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const next = await api<Settings>('/me/settings', { method: 'PUT', body: p });
     setSession((s) => (s && s.user ? { ...s, user: { ...s.user, settings: next } } : s));
   }, []);
-  const fmt = useMemo(() => makeFormat(settings), [settings]);
-  return <SessionCtx.Provider value={{ session, refresh, settings, fmt, updateSettings }}>{children}</SessionCtx.Provider>;
+  const fmt = useMemo(() => makeFormat(settings, lang), [settings, lang]);
+  updateSettingsRef.current = updateSettings;
+  return <SessionCtx.Provider value={{ session, refresh, settings, fmt, updateSettings, lang, setDeviceLanguage }}>{children}</SessionCtx.Provider>;
 }
 
 export function useSession() {

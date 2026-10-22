@@ -56,7 +56,7 @@ test('activity search, filters and detail', async ({ page }) => {
   await startDemo(page);
   await go(page, 'Activity');
   await page.getByLabel('Search merchant, description or note').fill('pingo doce amoreiras');
-  await expect(page.getByText(/^1 transactions/)).toBeVisible();
+  await expect(page.getByText(/^1 transaction\b/)).toBeVisible();
   await page.getByRole('button', { name: /Open Pingo Doce/ }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByText('From your bank (never changed by Fluxo)').click();
@@ -247,4 +247,24 @@ test('review inbox, paid back, hints, recap and text size', async ({ page }) => 
   await page.getByRole('radio', { name: 'Large', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-text-size', 'large');
   await expect(page.getByRole('heading', { name: 'Install Fluxo as an app' })).toBeVisible();
+});
+
+test('Portuguese interface from Settings', async ({ page }) => {
+  await startDemo(page);
+  await go(page, 'Settings');
+  await page.getByLabel('Language · Idioma').selectOption('pt');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'pt-PT');
+  await expect(page.getByRole('heading', { name: 'Definições', level: 1 })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Definições', level: 1 })).toBeVisible(); // remembered on the account
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  if (await menu.isVisible()) await menu.click();
+  await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: 'Movimentos', exact: true }).click();
+  await expect(page.getByText(/^\d+ movimentos/)).toBeVisible();
+  await expect(page.locator('.txlist .tx').first()).toBeVisible();
+  await expect(page.getByLabel('Categoria')).toContainText('Supermercado'); // default categories renamed
+  await a11y(page);
+  await page.goto('/settings');
+  await page.getByLabel('Language · Idioma').selectOption('en');
+  await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
 });

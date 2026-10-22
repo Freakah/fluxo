@@ -19,6 +19,6 @@ export default defineConfig({
     command: 'node server/index.ts',
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: false,
-    env: { APP_MODE: 'demo', PORT: String(PORT), PUBLIC_URL: `http://localhost:${PORT}`, DATA_DIR: 'test-results/e2e-data', NODE_ENV: 'production', DATA_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', LOG_LEVEL: 'warn' },
+    env: { APP_MODE: 'demo', PORT: String(PORT), PUBLIC_URL: `http://localhost:${PORT}`, DATA_DIR: 'test-results/e2e-data', NODE_ENV: 'production', DATA_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', LOG_LEVEL: 'warn', DEMO_PER_HOUR: '500' },
   },
 });

@@ -10,6 +10,7 @@ export type Settings = {
   onboarded: boolean; // first-run welcome seen
   recapSeen: string | null; // last month whose recap was opened or dismissed (YYYY-MM)
   textSize: 'normal' | 'large' | 'xlarge';
+  language: 'en' | 'pt' | null; // null = follow this device/browser
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   onboarded: false,
   recapSeen: null,
   textSize: 'normal',
+  language: null,
 };
 
 export function mergeSettings(raw: unknown): Settings {

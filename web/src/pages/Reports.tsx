@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { Download, ArrowUpRight, ArrowDownLeft, Scale, PartyPopper } from 'lucide-react';
 import { RecapStory } from '../components/recap.tsx';
 import { useApi } from '../api.ts';
-import { m } from '../i18n.ts';
+import { m, t as tr } from '../i18n.ts';
 import { useCategories, useSession } from '../state.tsx';
 import { Card, ErrorBox, Loading, Money, Field, Help, Empty, PageHeader, Segmented, Info } from '../components/ui.tsx';
 import { BarList, Donut, MonthBars } from '../components/charts.tsx';
@@ -46,7 +46,7 @@ export function Reports() {
   const controls = (
     <div className="stack">
       <div className="toolbar">
-        <Segmented label={m.reports.range} value={preset} onChange={setPreset} options={PRESETS} />
+        <Segmented label={m.reports.range} value={preset} onChange={setPreset} options={PRESETS.map((p) => ({ ...p, label: tr(p.label) }))} />
         {(accts.data?.length ?? 0) > 1 && (
           <select aria-label={m.tx.account} className={`chip-select ${acct ? 'set' : ''}`} value={acct} onChange={(e) => setAcct(e.target.value)}>
             <option value="">{m.dashboard.allAccounts}</option>{accts.data?.map((a) => <option key={a.id} value={a.id}>{a.display_name ?? a.name}</option>)}
@@ -62,9 +62,9 @@ export function Reports() {
     </div>
   );
   const header = (
-    <PageHeader title={m.reports.title} subtitle="See patterns in your spending over time."
-      info={<>Completed payments by booking date. Payments marked “not counted” and transfers between your own accounts are left out. Other currencies are never converted or added together.</>}
-      actions={<><button className="btn" onClick={() => setRecap(true)}><PartyPopper size={18} aria-hidden="true" />Last month’s recap</button><a className="btn" href={`/api/transactions/export.csv?from=${range.from}&to=${range.to}${acctQs}`} download><Download size={18} aria-hidden="true" />{m.tx.export}</a></>} />
+    <PageHeader title={m.reports.title} subtitle={tr('See patterns in your spending over time.')}
+      info={tr('Completed payments by booking date. Payments marked “not counted” and transfers between your own accounts are left out. Other currencies are never converted or added together.')}
+      actions={<><button className="btn" onClick={() => setRecap(true)}><PartyPopper size={18} aria-hidden="true" />{tr('Last month’s recap')}</button><a className="btn" href={`/api/transactions/export.csv?from=${range.from}&to=${range.to}${acctQs}`} download><Download size={18} aria-hidden="true" />{m.tx.export}</a></>} />
   );
   const recapModal = recap && <RecapStory month={addMonths(monthOf(today), -1)} onClose={() => setRecap(false)} />;
   if (r.error) return <div className="page">{header}{controls}<ErrorBox error={r.error} onRetry={() => r.reload()} /></div>;
@@ -86,47 +86,47 @@ export function Reports() {
       {recapModal}
       {header}
       {controls}
-      <p className="muted small" style={{ margin: 0 }}>{fmt.date(x.from)} – {fmt.date(x.to)}{x.totals.length > 1 ? ` · amounts in ${cur}; ${x.totals.filter((v) => v.currency !== cur).map((v) => v.currency).join(', ')} shown separately` : ''}</p>
+      <p className="muted small" style={{ margin: 0 }}>{fmt.date(x.from)} – {fmt.date(x.to)}{x.totals.length > 1 ? ` · ${tr('amounts in {cur}; {others} shown separately', { cur, others: x.totals.filter((v) => v.currency !== cur).map((v) => v.currency).join(', ') })}` : ''}</p>
       <div className="stats">
         <div className="stat"><span className="stat-icon warn"><ArrowUpRight size={22} aria-hidden="true" /></span><div><div className="stat-label">{m.reports.spending}</div><div className="stat-value"><Money minor={t?.spending ?? 0} currency={cur} /></div></div></div>
         <div className="stat"><span className="stat-icon ok"><ArrowDownLeft size={22} aria-hidden="true" /></span><div><div className="stat-label">{m.reports.income}</div><div className="stat-value"><Money minor={t?.income ?? 0} currency={cur} /></div></div></div>
         <div className="stat"><span className={`stat-icon ${(t?.net ?? 0) < 0 ? 'bad' : 'accent'}`}><Scale size={22} aria-hidden="true" /></span><div><div className="stat-label">{m.dashboard.net}<Info>{m.dashboard.netHelp}</Info></div><div className={`stat-value ${(t?.net ?? 0) < 0 ? 'neg' : ''}`}><Money minor={t?.net ?? 0} currency={cur} sign="exceptZero" /></div></div></div>
       </div>
 
-      <Segmented label="View" value={view} onChange={setView} options={[{ value: 'overview', label: 'Where it went' }, { value: 'trends', label: 'Month by month' }]} />
+      <Segmented label={tr('View')} value={view} onChange={setView} options={[{ value: 'overview', label: tr('Where it went') }, { value: 'trends', label: tr('Month by month') }]} />
 
       {view === 'overview' ? (
         <div className="grid-2">
           <Card title={m.reports.byCategory}>
             {cats.length ? <>
-              <Donut caption={`${m.reports.byCategory} chart`} currency={cur} centerLabel="Total spent" onSelect={toCat} rows={cats.map((c) => ({ key: c.categoryId ?? 'none', label: c.name, value: c.spending, dot: c.color }))} />
+              <Donut caption={tr('{name} chart', { name: m.reports.byCategory })} currency={cur} centerLabel={tr('Total spent')} onSelect={toCat} rows={cats.map((c) => ({ key: c.categoryId ?? 'none', label: tr(c.name), value: c.spending, dot: c.color }))} />
               <BarList caption={m.reports.byCategory} currency={cur} onSelect={toCat}
-                rows={cats.map((c) => ({ key: c.categoryId ?? 'none', label: c.name, value: c.spending, dot: c.color, sub: `${c.count}×`, icon: <CatIcon cat={c.categoryId ? byId.get(c.categoryId) ?? { color: c.color } : null} size={34} /> }))} />
-            </> : <Empty art="chart" title="No spending in this period" />}
+                rows={cats.map((c) => ({ key: c.categoryId ?? 'none', label: tr(c.name), value: c.spending, dot: c.color, sub: `${c.count}×`, icon: <CatIcon cat={c.categoryId ? byId.get(c.categoryId) ?? { color: c.color } : null} size={34} /> }))} />
+            </> : <Empty art="chart" title={tr('No spending in this period')} />}
             {cats.some((c) => c.spending < 0) && <Help>{m.reports.negativeNote}</Help>}
           </Card>
           <Card title={m.reports.merchants}>
             {merch.length ? <BarList caption={m.reports.merchants} currency={cur} onSelect={(k) => nav(`/transactions?q=${encodeURIComponent(String(k))}&from=${x.from}&to=${x.to}`)}
-              rows={merch.map((c) => ({ key: c.merchant, label: c.merchant, value: c.spending, sub: `${c.count}×`, icon: <Monogram name={c.merchant} size={34} /> }))} /> : <Empty art="search" title="No merchants in this period" />}
+              rows={merch.map((c) => ({ key: c.merchant, label: tr(c.merchant), value: c.spending, sub: `${c.count}×`, icon: <Monogram name={c.merchant} size={34} /> }))} /> : <Empty art="search" title={tr('No merchants in this period')} />}
           </Card>
         </div>
       ) : (
         <>
           <Card title={m.reports.byMonth}>
             <MonthBars months={months} a={months.map((mo) => bm.get(mo)?.spending ?? 0)} b={months.map((mo) => bm.get(mo)?.income ?? 0)} labels={[m.reports.spending, m.reports.income]} currency={cur} onSelect={toMonth} />
-            <Help>Tip: click a month to see its payments.</Help>
+            <Help>{tr('Tip: click a month to see its payments.')}</Help>
           </Card>
           <div className="grid-2">
             <Card title={m.reports.budgetVsActual}>
               <MonthBars months={x.budgetVsActual.map((v) => v.month)} a={x.budgetVsActual.map((v) => v.actual)} labels={[m.reports.actual]} budgets={x.budgetVsActual.map((v) => v.budget)} currency={cur} onSelect={toMonth} />
-              <Help>Monthly budget across all accounts. The current month is not over yet ({fmt.date(monthBounds(monthOf(today)).from)} – today).</Help>
+              <Help>{tr('Monthly budget across all accounts. The current month is not over yet ({from} – today).', { from: fmt.date(monthBounds(monthOf(today)).from) })}</Help>
             </Card>
             <Card title={m.reports.commitments}>
               {Object.keys(commit).length ? (
                 <table className="table"><thead><tr><th scope="col">{m.recurring.kind}</th><th scope="col" className="num">{m.recurring.monthly}</th></tr></thead>
                   <tbody>{Object.entries(commit).map(([k, v]) => <tr key={k}><th scope="row">{m.kinds[k]}</th><td className="num">~<Money minor={v} currency={cur} /></td></tr>)}
-                    <tr><th scope="row">Total</th><td className="num"><strong>~<Money minor={Object.values(commit).reduce((a, b) => a + b, 0)} currency={cur} /></strong></td></tr></tbody></table>
-              ) : <Empty art="calendar" title="No confirmed bills yet">Confirm suggestions on the Bills page to include them here.</Empty>}
+                    <tr><th scope="row">{tr('Total')}</th><td className="num"><strong>~<Money minor={Object.values(commit).reduce((a, b) => a + b, 0)} currency={cur} /></strong></td></tr></tbody></table>
+              ) : <Empty art="calendar" title={tr('No confirmed bills yet')}>{tr('Confirm suggestions on the Bills page to include them here.')}</Empty>}
             </Card>
           </div>
         </>

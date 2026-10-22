@@ -1,5 +1,9 @@
-// All interface copy lives here so a Portuguese file (pt.ts with the same shape) can be added later
-// and selected from the locale setting. Keep amounts/dates out of strings; format them with format.ts.
+// Interface copy. English is the source text; pt.ts maps each English string to European Portuguese.
+// Shared labels live in `en` below; one-off page text calls t('English text') where it is used.
+// Keep amounts/dates out of strings; format them with format.ts.
+import { createElement, Fragment, type ReactNode } from 'react';
+import { pt, ptPatterns } from './pt.ts';
+
 export const en = {
   app: { name: 'Fluxo', tagline: 'Connect your bank account, let transactions sync automatically, and understand where your money goes.' },
   nav: { dashboard: 'Home', transactions: 'Activity', budgets: 'Budgets', recurring: 'Bills', reports: 'Insights', accounts: 'Banks', categories: 'Categories', settings: 'Settings', help: 'Help', notifications: 'Notifications', signOut: 'Sign out', skip: 'Skip to content', menu: 'Menu', more: 'More', groupMoney: 'Your money', groupSetup: 'Setup', search: 'Search', searchHint: 'Jump to a page or search your activity', profile: 'Account menu', review: 'To review' },
@@ -124,4 +128,59 @@ export const en = {
   errors: { generic: 'Something went wrong.', offline: 'You are offline. Data shown may be out of date and changes cannot be saved.' },
 };
 export type Messages = typeof en;
-export const m: Messages = en;
+export type Lang = 'en' | 'pt';
+
+let dict: Record<string, string> | null = null;
+let templates: [RegExp, string, string[]][] = [];
+export let lang: Lang = 'en';
+
+/** Translates English text. `{name}` placeholders are filled from vars. Unknown text is returned unchanged. */
+export function t(s: string, vars?: Record<string, string | number>): string {
+  let r = dict?.[s];
+  if (r === undefined && dict) {
+    // Text that arrives already filled in (server messages, merchant labels): match against templates.
+    for (const [re, out, names] of templates) {
+      const x = re.exec(s);
+      if (x) { r = names.reduce((a, n, i) => a.replace(`{${n}}`, dict![x[i + 1]] ?? x[i + 1]), out); break; }
+    }
+  }
+  r ??= s;
+  return vars ? r.replace(/\{(\w+)\}/g, (all, k: string) => (k in vars ? String(vars[k]) : all)) : r;
+}
+
+/** Like t(), for sentences with bold words, amounts or links inside: <T s="Is this {cat}?" cat={<strong>…</strong>} />. */
+export function T({ s, ...parts }: { s: string } & Record<string, ReactNode>) {
+  return createElement(Fragment, null, ...t(s).split(/(\{\w+\})/).map((p, i) => {
+    const k = /^\{(\w+)\}$/.exec(p)?.[1];
+    return createElement(Fragment, { key: i }, k && k in parts ? parts[k] : p);
+  }));
+}
+
+const escape = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const tr = <V,>(v: V): V => (typeof v === 'string' ? t(v) : Array.isArray(v) ? v.map(tr) : v && typeof v === 'object'
+  ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === 'art' || k === 'target' ? x : tr(x)])) : v) as V;
+
+/** The shared labels in the current language (updated in place by setLanguage). */
+export const m: Messages = structuredClone(en);
+
+export function setLanguage(l: Lang) {
+  if (l === lang) return;
+  lang = l;
+  dict = l === 'pt' ? pt : null;
+  templates = !dict ? [] : Object.entries(ptPatterns).map(([k, v]) => {
+    const names = [...k.matchAll(/\{(\w+)\}/g)].map((x) => x[1]);
+    return [new RegExp(`^${escape(k).replace(/\\\{\w+\\\}/g, '(.+?)')}$`), v, names];
+  });
+  Object.assign(m, tr(structuredClone(en)));
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = l === 'pt' ? 'pt-PT' : 'en';
+    document.title = l === 'pt' ? 'Fluxo — controlo de despesas' : 'Fluxo — expense tracker';
+  }
+}
+
+/** Language before sign-in: the last one used on this device, else the browser's. Not financial data. */
+export function initialLanguage(): Lang {
+  try { const s = localStorage.getItem('fluxo-lang'); if (s === 'en' || s === 'pt') return s; } catch { /* storage blocked */ }
+  return navigator.language?.toLowerCase().startsWith('pt') ? 'pt' : 'en';
+}
+export function rememberLanguage(l: Lang) { try { localStorage.setItem('fluxo-lang', l); } catch { /* storage blocked */ } }

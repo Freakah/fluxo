@@ -49,7 +49,6 @@ original task; this file tracks status.
 - [ ] Installing on a phone needs HTTPS (service workers require a secure context); on the computer itself (localhost) it works in Chrome/Edge.
 
 ## Remaining / future work
-- Portuguese interface: `web/src/i18n.ts` holds part of the copy; many page strings are still inline and need moving there first
 - Email/push notifications (optional), QR code for TOTP setup
 - Savings goals, household sharing, receipt OCR, forecasting, AI classification (out of scope)
 

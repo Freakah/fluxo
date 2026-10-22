@@ -685,3 +685,4 @@ html, body { overflow-x: clip; }
   .tx-amount { grid-column: 3; grid-row: 1; align-self: start; }
   .tx-badges { grid-column: 2 / 4; grid-row: 2; justify-content: flex-start; }
 }
+.lang-switch { display: flex; width: fit-content; margin: 0 0 1rem auto; }

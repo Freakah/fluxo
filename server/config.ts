@@ -24,6 +24,8 @@ const schema = z.object({
   // https page registered with the provider that forwards to <PUBLIC_URL>/api/connections/callback (providers reject http://localhost).
   BANK_REDIRECT_URL: z.url().refine((u) => u.startsWith('https://'), 'must use https://').optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  // Demo workspaces one address may start per hour (demo mode only).
+  DEMO_PER_HOUR: z.coerce.number().int().min(1).max(10_000).default(20),
 });
 
 export type Config = z.infer<typeof schema> & { encryptionKey: Buffer; dbPath: string; enableBankingConfigured: boolean };

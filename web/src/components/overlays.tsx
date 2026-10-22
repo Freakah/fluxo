@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { Search, ArrowRight, Plus, Landmark, Target, Compass, EyeOff } from 'lucide-react';
-import { m } from '../i18n.ts';
+import { m, t } from '../i18n.ts';
 import { useSession } from '../state.tsx';
 import { Modal } from './ui.tsx';
 import { Art } from './illustrations.tsx';
@@ -14,7 +14,7 @@ export function Welcome({ onDone }: { onDone: (tour: boolean) => void }) {
   const A = Art[s.art];
   const last = i === steps.length - 1;
   return (
-    <Modal open title={`Welcome (${i + 1} of ${steps.length})`} onClose={() => onDone(false)} footer={<>
+    <Modal open title={t('Welcome ({i} of {n})', { i: i + 1, n: steps.length })} onClose={() => onDone(false)} footer={<>
       <button className="btn btn-ghost" onClick={() => onDone(false)}>{m.welcome.skip}</button>
       <span className="spacer" />
       {i > 0 && <button className="btn" onClick={() => setI(i - 1)}>{m.welcome.back}</button>}
@@ -68,7 +68,7 @@ export function Tour({ onDone }: { onDone: () => void }) {
     <>
       <div className="tour-hl" style={{ left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }} />
       <div className="tour-card" role="dialog" aria-modal="false" aria-labelledby="tour-title" style={pos}>
-        <small className="muted">{i + 1} of {steps.length}</small>
+        <small className="muted">{t('{i} of {n}', { i: i + 1, n: steps.length })}</small>
         <h2 id="tour-title">{step.title}</h2>
         <p>{step.text}</p>
         <div className="tour-foot">
@@ -93,17 +93,17 @@ export function CommandPalette({ open, onClose, pages, onTour }: { open: boolean
   useEffect(() => { if (open) { setQ(''); setSel(0); } }, [open]);
   const go = (to: string) => () => nav(to);
   const all: Cmd[] = [
-    ...pages.map((p) => ({ id: p.to, label: `Go to ${p.label}`, icon: p.icon, run: go(p.to) })),
-    { id: 'cash', label: 'Add a cash payment', icon: <Plus size={18} />, run: go('/transactions?add=cash') },
-    { id: 'connect', label: 'Connect a bank', icon: <Landmark size={18} />, run: go('/accounts?connect=1') },
-    { id: 'budget', label: 'Set a budget', icon: <Target size={18} />, run: go('/budgets') },
-    { id: 'hide', label: settings.hideAmounts ? 'Show amounts' : 'Hide amounts', icon: <EyeOff size={18} />, run: () => { void updateSettings({ hideAmounts: !settings.hideAmounts }); } },
-    { id: 'tour', label: 'Take the tour', icon: <Compass size={18} />, run: onTour },
+    ...pages.map((p) => ({ id: p.to, label: t('Go to {page}', { page: t(p.label) }), icon: p.icon, run: go(p.to) })),
+    { id: 'cash', label: t('Add a cash payment'), icon: <Plus size={18} />, run: go('/transactions?add=cash') },
+    { id: 'connect', label: t('Connect a bank'), icon: <Landmark size={18} />, run: go('/accounts?connect=1') },
+    { id: 'budget', label: t('Set a budget'), icon: <Target size={18} />, run: go('/budgets') },
+    { id: 'hide', label: settings.hideAmounts ? m.common.showAmounts : m.common.hideAmounts, icon: <EyeOff size={18} />, run: () => { void updateSettings({ hideAmounts: !settings.hideAmounts }); } },
+    { id: 'tour', label: t('Take the tour'), icon: <Compass size={18} />, run: onTour },
   ];
   const needle = q.trim().toLowerCase();
   const items = [
     ...all.filter((c) => c.label.toLowerCase().includes(needle)),
-    ...(needle ? [{ id: 'search', label: `Search activity for “${q.trim()}”`, icon: <Search size={18} />, run: go(`/transactions?q=${encodeURIComponent(q.trim())}`) }] : []),
+    ...(needle ? [{ id: 'search', label: t('Search activity for “{q}”', { q: q.trim() }), icon: <Search size={18} />, run: go(`/transactions?q=${encodeURIComponent(q.trim())}`) }] : []),
   ];
   const pick = (c: Cmd) => { onClose(); c.run(); };
   return (
@@ -116,7 +116,7 @@ export function CommandPalette({ open, onClose, pages, onTour }: { open: boolean
           if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => Math.max(0, s - 1)); }
           if (e.key === 'Enter' && items[sel]) { e.preventDefault(); pick(items[sel]); }
         }} />
-      <ul className="palette-list" id="palette-list" role="listbox" aria-label="Results">
+      <ul className="palette-list" id="palette-list" role="listbox" aria-label={t('Results')}>
         {items.map((c, k) => (
           <li key={c.id} role="presentation">
             <button id={`pal-${c.id}`} role="option" aria-selected={k === sel} tabIndex={-1} className={`palette-item ${k === sel ? 'on' : ''}`} onMouseMove={() => { if (sel !== k) setSel(k); }} onClick={() => pick(c)}>
@@ -124,7 +124,7 @@ export function CommandPalette({ open, onClose, pages, onTour }: { open: boolean
             </button>
           </li>
         ))}
-        {!items.length && <li className="muted" style={{ padding: '.6rem' }}>No matches</li>}
+        {!items.length && <li className="muted" style={{ padding: '.6rem' }}>{t('No matches')}</li>}
       </ul>
     </Modal>
   );

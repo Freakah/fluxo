@@ -1,6 +1,6 @@
 // Small hand-rolled SVG charts. Every chart can switch to an accessible table with the same numbers.
 import { useState, type ReactNode } from 'react';
-import { m } from '../i18n.ts';
+import { m, t } from '../i18n.ts';
 import { useSession } from '../state.tsx';
 
 export function ChartFrame({ table, children, caption }: { table: ReactNode; children: ReactNode; caption: string }) {
@@ -19,7 +19,7 @@ type Row = { key: string | number; label: string; value: number; dot?: string; s
 function rowsTable(rows: Row[], caption: string, money: (v: number) => string) {
   return (
     <table className="table"><caption className="sr-only">{caption}</caption>
-      <thead><tr><th scope="col">Name</th><th scope="col" className="num">Amount</th></tr></thead>
+      <thead><tr><th scope="col">{t('Name')}</th><th scope="col" className="num">{t('Amount')}</th></tr></thead>
       <tbody>{rows.map((r) => <tr key={r.key}><th scope="row">{r.label}</th><td className="num">{money(r.value)}</td></tr>)}</tbody>
     </table>
   );
@@ -98,16 +98,16 @@ export function CumulativeChart({ current, previous, days, currency }: { current
   const path = (vals: number[]) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   const hi = hover ?? current.length - 1;
   const table = (
-    <table className="table"><caption className="sr-only">Cumulative spending by day</caption>
-      <thead><tr><th scope="col">Day</th><th scope="col" className="num">{m.dashboard.trendThis}</th><th scope="col" className="num">{m.dashboard.trendPrev}</th></tr></thead>
+    <table className="table"><caption className="sr-only">{t('Cumulative spending by day')}</caption>
+      <thead><tr><th scope="col">{t('Day')}</th><th scope="col" className="num">{m.dashboard.trendThis}</th><th scope="col" className="num">{m.dashboard.trendPrev}</th></tr></thead>
       <tbody>{Array.from({ length: n }, (_, i) => <tr key={i}><th scope="row">{i + 1}</th><td className="num">{i < current.length ? fmt.money(current[i], currency) : '—'}</td><td className="num">{i < previous.length ? fmt.money(previous[i], currency) : '—'}</td></tr>)}</tbody>
     </table>
   );
   return (
-    <ChartFrame caption="Cumulative spending this month compared with last month" table={table}>
+    <ChartFrame caption={t('Cumulative spending this month compared with last month')} table={table}>
       <div className="legend" aria-hidden="true"><span><i className="swatch s1" />{m.dashboard.trendThis}</span><span><i className="swatch s-prev" />{m.dashboard.trendPrev}</span></div>
-      <p className="chart-readout">Day {hi + 1}: <strong>{fmt.money(current[hi] ?? null, currency)}</strong> · {m.dashboard.trendPrev.toLowerCase()} {fmt.money(previous[hi] ?? null, currency)}</p>
-      <svg viewBox={`0 0 ${W} ${H}`} className="svg-chart" role="img" aria-label="Line chart of cumulative spending; use the table view for values"
+      <p className="chart-readout">{t('Day {n}', { n: hi + 1 })}: <strong>{fmt.money(current[hi] ?? null, currency)}</strong> · {m.dashboard.trendPrev.toLowerCase()} {fmt.money(previous[hi] ?? null, currency)}</p>
+      <svg viewBox={`0 0 ${W} ${H}`} className="svg-chart" role="img" aria-label={t('Line chart of cumulative spending; use the table view for values')}
         onMouseLeave={() => setHover(null)}
         onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const i = Math.round(((e.clientX - r.left) / r.width * W - PAD.l) / (W - PAD.l - PAD.r) * (n - 1)); setHover(Math.max(0, Math.min(current.length - 1, i))); }}>
         {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} className="grid" x1={PAD.l} x2={W - PAD.r} y1={y(max * f)} y2={y(max * f)} />)}
@@ -133,16 +133,16 @@ export function MonthBars({ months, a, b, labels, currency, budgets, onSelect }:
   const y = (v: number) => H - PAD.b - (Math.max(0, v) / max) * (H - PAD.t - PAD.b);
   const hi = hover ?? n - 1;
   const table = (
-    <table className="table"><caption className="sr-only">Values by month</caption>
-      <thead><tr><th scope="col">Month</th><th scope="col" className="num">{labels[0]}</th>{b && <th scope="col" className="num">{labels[1]}</th>}{budgets && <th scope="col" className="num">{m.reports.budget}</th>}</tr></thead>
+    <table className="table"><caption className="sr-only">{t('Values by month')}</caption>
+      <thead><tr><th scope="col">{t('Month')}</th><th scope="col" className="num">{labels[0]}</th>{b && <th scope="col" className="num">{labels[1]}</th>}{budgets && <th scope="col" className="num">{m.reports.budget}</th>}</tr></thead>
       <tbody>{months.map((mo, i) => <tr key={mo}><th scope="row">{fmt.month(mo)}</th><td className="num">{fmt.money(a[i], currency)}</td>{b && <td className="num">{fmt.money(b[i], currency)}</td>}{budgets && <td className="num">{budgets[i] === null ? '—' : fmt.money(budgets[i], currency)}</td>}</tr>)}</tbody>
     </table>
   );
   return (
-    <ChartFrame caption={`${labels.filter(Boolean).join(' and ')} by month`} table={table}>
+    <ChartFrame caption={t('{what} by month', { what: labels.filter(Boolean).join(' · ') })} table={table}>
       <div className="legend" aria-hidden="true"><span><i className="swatch s1" />{labels[0]}</span>{b && <span><i className="swatch s2" />{labels[1]}</span>}{budgets && <span><i className="swatch s-budget" />{m.reports.budget}</span>}</div>
       {n > 0 && <p className="chart-readout">{fmt.month(months[hi])}: <strong>{fmt.money(a[hi], currency)}</strong> {labels[0].toLowerCase()}{b && <> · <strong>{fmt.money(b[hi], currency)}</strong> {labels[1]?.toLowerCase()}</>}{budgets?.[hi] != null && <> · {m.reports.budget.toLowerCase()} {fmt.money(budgets[hi], currency)}</>}</p>}
-      <svg viewBox={`0 0 ${W} ${H}`} className="svg-chart" role="img" aria-label="Bar chart by month; use the table view for values" onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="svg-chart" role="img" aria-label={t('Bar chart by month; use the table view for values')} onMouseLeave={() => setHover(null)}>
         {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} className="grid" x1={PAD.l} x2={W - PAD.r} y1={y(max * f)} y2={y(max * f)} />)}
         {[0.5, 1].map((f) => <text key={f} className="tick" x={W - PAD.r} y={y(max * f) - 4} textAnchor="end">{fmt.compact(max * f, currency)}</text>)}
         {months.map((mo, i) => {
@@ -176,15 +176,15 @@ export function BalanceChart({ points, currency }: { points: { date: string; bal
   const d = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   const i = hover ?? n - 1;
   const table = (
-    <table className="table"><caption className="sr-only">Balance by day</caption>
-      <thead><tr><th scope="col">Date</th><th scope="col" className="num">Balance</th></tr></thead>
+    <table className="table"><caption className="sr-only">{t('Balance by day')}</caption>
+      <thead><tr><th scope="col">{t('Date')}</th><th scope="col" className="num">{t('Balance')}</th></tr></thead>
       <tbody>{points.filter((_, k) => k % 7 === (n - 1) % 7).map((p) => <tr key={p.date}><th scope="row">{fmt.date(p.date)}</th><td className="num">{fmt.money(p.balance, currency)}</td></tr>)}</tbody>
     </table>
   );
   return (
-    <ChartFrame caption="Balance over the last 90 days" table={table}>
+    <ChartFrame caption={t('Balance over the last 90 days')} table={table}>
       <p className="chart-readout">{fmt.shortDate(points[i].date)}: <strong>{fmt.money(points[i].balance, currency)}</strong></p>
-      <svg viewBox={`0 0 ${W} ${h}`} className="svg-chart" role="img" aria-label="Line chart of your balance; use the table view for values" onMouseLeave={() => setHover(null)}
+      <svg viewBox={`0 0 ${W} ${h}`} className="svg-chart" role="img" aria-label={t('Line chart of your balance; use the table view for values')} onMouseLeave={() => setHover(null)}
         onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHover(Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) / r.width * W - PAD.l) / (W - PAD.l - PAD.r) * (n - 1))))); }}>
         <path d={`${d} L${x(n - 1)},${h} L${x(0)},${h} Z`} className="area-1" />
         <path d={d} className="line line-1" />

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { TrendingDown, TrendingUp, Trophy, Sparkles } from 'lucide-react';
 import { useApi } from '../api.ts';
-import { m } from '../i18n.ts';
+import { m, t, T } from '../i18n.ts';
 import { useCategories, useSession } from '../state.tsx';
 import { ErrorBox, Loading, Modal, Money, Ring } from './ui.tsx';
 import { CatIcon, Monogram } from './icons.tsx';
@@ -23,37 +23,37 @@ export function RecapStory({ month, onClose }: { month: string; onClose: () => v
   const r = useApi<Recap>(`/recap?month=${month}`);
   const [i, setI] = useState(0);
   const x = r.data;
-  const name = (id: number | null) => (id ? byId.get(id)?.name : undefined) ?? 'Uncategorized';
+  const name = (id: number | null) => (id ? byId.get(id)?.name : undefined) ?? t('Uncategorized');
   const prevName = fmt.month(addMonths(month, -1)).split(' ')[0];
 
   const slides = !x ? [] : [
     <>
       <Art.chart />
-      <p className="recap-kicker">In {fmt.month(x.month)} you spent</p>
+      <p className="recap-kicker">{t('In {month} you spent', { month: fmt.month(x.month) })}</p>
       <p className="recap-big"><Money minor={x.spending} currency={x.currency} /></p>
       {x.previousSpending > 0 && x.spending !== x.previousSpending && (
         <p className={`trend ${x.spending < x.previousSpending ? 'good' : 'bad'}`}>
           {x.spending < x.previousSpending ? <TrendingDown size={16} aria-hidden="true" /> : <TrendingUp size={16} aria-hidden="true" />}
-          <Money minor={Math.abs(x.spending - x.previousSpending)} currency={x.currency} /> {x.spending < x.previousSpending ? 'less' : 'more'} than in {prevName}
+          <T s={x.spending < x.previousSpending ? '{amount} less than in {month}' : '{amount} more than in {month}'} amount={<Money minor={Math.abs(x.spending - x.previousSpending)} currency={x.currency} />} month={prevName} />
         </p>
       )}
-      <p className="muted">{x.count} payments in and out.</p>
+      <p className="muted">{t('{n} payments in and out.', { n: x.count })}</p>
     </>,
     x.topCategory ? (
       <>
         <CatIcon cat={x.topCategory.categoryId ? byId.get(x.topCategory.categoryId) : null} size={88} />
-        <p className="recap-kicker">Most of it went to</p>
+        <p className="recap-kicker">{t('Most of it went to')}</p>
         <p className="recap-big">{name(x.topCategory.categoryId)}</p>
-        <p><Money minor={x.topCategory.spending} currency={x.currency} />{x.spending > 0 && <>, about {Math.round((x.topCategory.spending / x.spending) * 100)}% of your spending.</>}</p>
+        <p>{x.spending > 0 ? <T s="{amount}, about {pct}% of your spending." amount={<Money minor={x.topCategory.spending} currency={x.currency} />} pct={Math.round((x.topCategory.spending / x.spending) * 100)} /> : <Money minor={x.topCategory.spending} currency={x.currency} />}</p>
       </>
     ) : null,
     x.biggestChange && x.biggestChange.current !== x.biggestChange.previous ? (
       <>
         <CatIcon cat={x.biggestChange.categoryId ? byId.get(x.biggestChange.categoryId) : null} size={88} />
-        <p className="recap-kicker">The biggest change</p>
+        <p className="recap-kicker">{t('The biggest change')}</p>
         <p className="recap-big">{name(x.biggestChange.categoryId)}</p>
         <p className={`trend ${x.biggestChange.current < x.biggestChange.previous ? 'good' : 'bad'}`}>
-          {x.biggestChange.current < x.biggestChange.previous ? 'Down' : 'Up'} <Money minor={Math.abs(x.biggestChange.current - x.biggestChange.previous)} currency={x.currency} /> from {prevName}
+          <T s={x.biggestChange.current < x.biggestChange.previous ? 'Down {amount} from {month}' : 'Up {amount} from {month}'} amount={<Money minor={Math.abs(x.biggestChange.current - x.biggestChange.previous)} currency={x.currency} />} month={prevName} />
         </p>
         <p className="muted"><Money minor={x.biggestChange.previous} currency={x.currency} /> → <Money minor={x.biggestChange.current} currency={x.currency} /></p>
       </>
@@ -61,22 +61,22 @@ export function RecapStory({ month, onClose }: { month: string; onClose: () => v
     x.topMerchant ? (
       <>
         <Monogram name={x.topMerchant.merchant} size={88} />
-        <p className="recap-kicker">Your most visited place</p>
-        <p className="recap-big">{x.topMerchant.merchant}</p>
-        <p>{x.topMerchant.count} {x.topMerchant.count === 1 ? 'time' : 'times'}, <Money minor={x.topMerchant.spending} currency={x.currency} /> in total.</p>
+        <p className="recap-kicker">{t('Your most visited place')}</p>
+        <p className="recap-big">{t(x.topMerchant.merchant)}</p>
+        <p><T s={x.topMerchant.count === 1 ? '{n} time, {amount} in total.' : '{n} times, {amount} in total.'} n={x.topMerchant.count} amount={<Money minor={x.topMerchant.spending} currency={x.currency} />} /></p>
       </>
     ) : null,
     <>
       {x.budgets.total ? (
         <>
-          <Ring pct={(x.budgets.kept / x.budgets.total) * 100} state={x.budgets.kept === x.budgets.total ? 'ok' : x.budgets.kept * 2 >= x.budgets.total ? 'warning' : 'over'} size={130} label={`${x.budgets.kept} of ${x.budgets.total} budgets kept`}>
+          <Ring pct={(x.budgets.kept / x.budgets.total) * 100} state={x.budgets.kept === x.budgets.total ? 'ok' : x.budgets.kept * 2 >= x.budgets.total ? 'warning' : 'over'} size={130} label={t('{kept} of {total} budgets kept', { kept: x.budgets.kept, total: x.budgets.total })}>
             <strong>{x.budgets.kept}/{x.budgets.total}</strong>
           </Ring>
-          <p className="recap-kicker">Budgets kept</p>
-          <p className="recap-big">{x.budgets.kept === x.budgets.total ? <><Trophy size={28} aria-hidden="true" /> All of them!</> : `${x.budgets.kept} of ${x.budgets.total}`}</p>
+          <p className="recap-kicker">{t('Budgets kept')}</p>
+          <p className="recap-big">{x.budgets.kept === x.budgets.total ? <><Trophy size={28} aria-hidden="true" /> {t('All of them!')}</> : t('{i} of {n}', { i: x.budgets.kept, n: x.budgets.total })}</p>
         </>
       ) : <Art.target />}
-      <p className="recap-cheer"><Sparkles size={18} aria-hidden="true" /> {cheer(x)}</p>
+      <p className="recap-cheer"><Sparkles size={18} aria-hidden="true" /> {t(cheer(x))}</p>
     </>,
   ].filter(Boolean);
   const last = i >= slides.length - 1;
@@ -89,7 +89,7 @@ export function RecapStory({ month, onClose }: { month: string; onClose: () => v
       {r.error && <ErrorBox error={r.error} />}
       {!x ? <Loading /> : (
         <div className="welcome recap-slide" key={i} aria-live="polite">
-          <span className="sr-only">Card {i + 1} of {slides.length}. </span>{slides[i]}
+          <span className="sr-only">{t('Card {i} of {n}.', { i: i + 1, n: slides.length })} </span>{slides[i]}
           <div className="steps-dots" aria-hidden="true">{slides.map((_, k) => <span key={k} className={k === i ? 'on' : ''} />)}</div>
         </div>
       )}

@@ -7,6 +7,7 @@ All notable changes are documented here. Versions follow [Semantic Versioning](h
 First public version.
 
 ### Added
+- Full European Portuguese interface with a language switch in Settings and on the sign-in page; Portuguese dates and amounts; default category names follow the language; server messages, notifications and Fluxo's own merchant labels (MB WAY, transfers) are translated too. A test checks every string has a translation.
 - “To review” inbox for new payments (one-tap confirm, swipe on phones, change category with an optional rule, mark all as checked) with a count in the menu and a reminder on Home.
 - “Paid back”: link incoming money (e.g. a friend’s MB WAY) to the expense it repays; it becomes a refund in that category so only your share counts.
 - Hints on Home (a category well above its usual month; a subscription price rise), a monthly recap story, and a 90-day balance chart worked back from the bank balance.

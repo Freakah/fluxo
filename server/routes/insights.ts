@@ -11,6 +11,7 @@ import { TX_SELECT } from '../domain/txquery.ts';
 import { hints, recap, balanceHistory } from '../domain/highlights.ts';
 import { addDays, addMonths, isDate, isMonth, monthBounds, monthOf, todayIn, daysBetween } from '../../shared/dates.ts';
 import { mergeSettings } from '../../shared/settings.ts';
+import { DEFAULT_CATEGORIES, PT_CATEGORY_NAMES } from '../domain/categorize.ts';
 import { parseAmountToMinor } from '../../shared/money.ts';
 
 const idsParam = (c: Context, userId: number, db: Deps['db']): number[] | null => {
@@ -187,12 +188,18 @@ export function insightRoutes(deps: Deps) {
     onboarded: z.boolean().optional(),
     recapSeen: z.string().refine(isMonth).nullable().optional(),
     textSize: z.enum(['normal', 'large', 'xlarge']).optional(),
+    language: z.enum(['en', 'pt']).nullable().optional(),
   }).strict();
   app.put('/me/settings', async (c) => {
     const b = await body(c, settingsSchema);
     const cur = userSettings(db, uid(c));
     const next = mergeSettings({ ...cur, ...b, notify: { ...cur.notify, ...(b.notify ?? {}) } });
     run(db, 'UPDATE users SET settings_json = ? WHERE id = ?', JSON.stringify(next), uid(c));
+    // Default category names follow the language, unless the user renamed them.
+    if (b.language) for (const d of DEFAULT_CATEGORIES) {
+      const [from, to] = b.language === 'pt' ? [d.name, PT_CATEGORY_NAMES[d.key]] : [PT_CATEGORY_NAMES[d.key], d.name];
+      run(db, 'UPDATE categories SET name = ? WHERE user_id = ? AND key = ? AND name = ?', to, uid(c), d.key, from);
+    }
     return c.json(next);
   });
 

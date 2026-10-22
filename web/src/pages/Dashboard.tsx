@@ -3,7 +3,7 @@ import { RecapStory } from '../components/recap.tsx';
 import { Link, useNavigate } from 'react-router';
 import { ArrowDownLeft, Scale, CalendarClock, TrendingDown, TrendingUp, TriangleAlert, ChevronRight, Hourglass, Wallet, Inbox, Lightbulb, PartyPopper } from 'lucide-react';
 import { useApi } from '../api.ts';
-import { m } from '../i18n.ts';
+import { m, t, T } from '../i18n.ts';
 import { useCategories, useSession } from '../state.tsx';
 import { Card, ErrorBox, Loading, Money, Empty, CountUp, Info, Progress, stateBadge } from '../components/ui.tsx';
 import { Donut, CumulativeChart, BalanceChart } from '../components/charts.tsx';
@@ -25,7 +25,7 @@ type Hint = { kind: 'category_up'; categoryId: number | null; current: number; u
 
 function greeting(tz: string) {
   const h = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: tz }).format(new Date()));
-  return h < 12 ? 'Good morning' : h < 19 ? 'Good afternoon' : 'Good evening';
+  return t(h < 12 ? 'Good morning' : h < 19 ? 'Good afternoon' : 'Good evening');
 }
 
 export function Dashboard() {
@@ -55,8 +55,10 @@ export function Dashboard() {
   // The recap card shows during the first 10 days of a month until opened or dismissed.
   const showRecap = x.trend.dayOfMonth <= 10 && settings.recapSeen !== lastMonth && x.trend.previous.at(-1)! > 0;
   const hintText = (h: Hint) => h.kind === 'category_up'
-    ? <><strong>{h.categoryId ? byId.get(h.categoryId)?.name ?? 'A category' : 'Uncategorized'}</strong>: {h.pct < 100 ? `${h.pct}% more than usual` : `about ${Math.round((h.current / h.usual) * 10) / 10} times the usual`} this month. <Money minor={h.current} currency={x.currency} /> so far, usually about <Money minor={h.usual} currency={x.currency} /> a month.</>
-    : <><strong>{h.merchant}</strong> went up from <Money minor={h.from} currency={h.currency} /> to <Money minor={h.to} currency={h.currency} />.</>;
+    ? <T s={h.pct < 100 ? '{category}: {pct}% more than usual this month. {amount} so far, usually about {usual} a month.' : '{category}: about {times} times the usual this month. {amount} so far, usually about {usual} a month.'}
+        category={<strong>{h.categoryId ? byId.get(h.categoryId)?.name ?? t('A category') : t('Uncategorized')}</strong>} pct={h.pct} times={(Math.round((h.current / h.usual) * 10) / 10).toLocaleString(fmt.locale)}
+        amount={<Money minor={h.current} currency={x.currency} />} usual={<Money minor={h.usual} currency={x.currency} />} />
+    : <T s="{merchant} went up from {from} to {to}." merchant={<strong>{t(h.merchant)}</strong>} from={<Money minor={h.from} currency={h.currency} />} to={<Money minor={h.to} currency={h.currency} />} />;
 
   return (
     <div className="page">
@@ -81,8 +83,8 @@ export function Dashboard() {
           {x.sync.problems.map((p) => (
             <div key={p.id} className="attention-row" role="alert">
               <TriangleAlert size={18} aria-hidden="true" />
-              <span><strong>{p.institution}:</strong> {p.message}</span>
-              <Link className="btn btn-small" to="/accounts">Fix</Link>
+              <span><strong>{p.institution}:</strong> {p.message && t(p.message)}</span>
+              <Link className="btn btn-small" to="/accounts">{t('Fix')}</Link>
             </div>
           ))}
         </section>
@@ -110,16 +112,16 @@ export function Dashboard() {
         <>
           <section className="card hero" aria-labelledby="hero-label">
             <div>
-              <div className="hero-label" id="hero-label">{m.dashboard.spending}<Info label="How is this calculated?">{m.dashboard.spendingHelp}</Info></div>
+              <div className="hero-label" id="hero-label">{m.dashboard.spending}<Info label={t('How is this calculated?')}>{m.dashboard.spendingHelp}</Info></div>
               <div className="hero-big"><CountUp minor={main.spending} currency={x.currency} /></div>
               <div className="row">
                 {diff !== null && diff !== 0 && (
                   <span className={`trend ${diff < 0 ? 'good' : 'bad'}`}>
                     {diff < 0 ? <TrendingDown size={16} aria-hidden="true" /> : <TrendingUp size={16} aria-hidden="true" />}
-                    <Money minor={Math.abs(diff)} currency={x.currency} /> {diff < 0 ? 'less' : 'more'} than this time last month
+                    <T s={diff < 0 ? '{amount} less than this time last month' : '{amount} more than this time last month'} amount={<Money minor={Math.abs(diff)} currency={x.currency} />} />
                   </span>
                 )}
-                {main.pendingOut > 0 && <span className="muted small"><Hourglass size={14} aria-hidden="true" style={{ verticalAlign: -2 }} /> + <Money minor={main.pendingOut} currency={x.currency} /> processing<Info label="What does processing mean?">{m.dashboard.pendingHelp}</Info></span>}
+                {main.pendingOut > 0 && <span className="muted small"><Hourglass size={14} aria-hidden="true" style={{ verticalAlign: -2 }} /> <T s="+ {amount} processing" amount={<Money minor={main.pendingOut} currency={x.currency} />} /><Info label={t('What does processing mean?')}>{m.dashboard.pendingHelp}</Info></span>}
               </div>
             </div>
             <div className="hero-side">
@@ -127,16 +129,16 @@ export function Dashboard() {
                 <>
                   <div className="hero-side-top"><span className="muted">{m.dashboard.budgetRemaining}</span>{stateBadge(x.budget.state)}</div>
                   <div className="hero-side-top" style={{ margin: '.35rem 0 .6rem' }}>
-                    <strong className={x.budget.remaining < 0 ? 'neg' : ''}><Money minor={Math.abs(x.budget.remaining)} currency={x.currency} /> {x.budget.remaining < 0 ? 'over' : 'left'}</strong>
-                    <span className="muted small">of <Money minor={x.budget.amount} currency={x.currency} /></span>
+                    <strong className={x.budget.remaining < 0 ? 'neg' : ''}><T s={x.budget.remaining < 0 ? '{amount} over' : '{amount} left'} amount={<Money minor={Math.abs(x.budget.remaining)} currency={x.currency} />} /></strong>
+                    <span className="muted small"><T s="of {amount}" amount={<Money minor={x.budget.amount} currency={x.currency} />} /></span>
                   </div>
-                  <Progress pct={x.budget.pct} state={x.budget.state} label={`${x.budget.pct}% of monthly budget used`} />
-                  <p className="help">{x.budget.remaining > 0 ? <>About <Money minor={Math.floor(x.budget.remaining / daysLeft)} currency={x.currency} /> a day for the next {daysLeft} days.</> : 'You have used the whole budget for this month.'} <Info label="About the budget">{m.dashboard.budgetHelp}</Info></p>
+                  <Progress pct={x.budget.pct} state={x.budget.state} label={t('{pct}% of monthly budget used', { pct: x.budget.pct })} />
+                  <p className="help">{x.budget.remaining > 0 ? <T s="About {amount} a day for the next {n} days." amount={<Money minor={Math.floor(x.budget.remaining / daysLeft)} currency={x.currency} />} n={daysLeft} /> : t('You have used the whole budget for this month.')} <Info label={t('About the budget')}>{m.dashboard.budgetHelp}</Info></p>
                 </>
               ) : (
                 <div className="stack" style={{ gap: '.5rem' }}>
-                  <strong>Set a monthly budget</strong>
-                  <span className="muted small">Pick an amount for the month and Fluxo shows how much is left every day.</span>
+                  <strong>{t('Set a monthly budget')}</strong>
+                  <span className="muted small">{t('Pick an amount for the month and Fluxo shows how much is left every day.')}</span>
                   <Link className="btn btn-primary btn-small" to="/budgets" style={{ alignSelf: 'flex-start' }}>{m.dashboard.setBudget}</Link>
                 </div>
               )}
@@ -145,11 +147,11 @@ export function Dashboard() {
 
           <div className="stats">
             <div className="stat"><span className="stat-icon ok"><ArrowDownLeft size={22} aria-hidden="true" /></span><div><div className="stat-label">{m.dashboard.income}</div><div className="stat-value"><Money minor={main.income} currency={x.currency} /></div></div></div>
-            <div className="stat"><span className={`stat-icon ${main.net < 0 ? 'bad' : 'accent'}`}><Scale size={22} aria-hidden="true" /></span><div><div className="stat-label">{m.dashboard.net}<Info label="What is left over?">{m.dashboard.netHelp}</Info></div><div className={`stat-value ${main.net < 0 ? 'neg' : ''}`}><Money minor={main.net} currency={x.currency} sign="exceptZero" /></div></div></div>
-            <Link to="/recurring" className="stat"><span className="stat-icon warn"><CalendarClock size={22} aria-hidden="true" /></span><div><div className="stat-label">Bills in the next 30 days</div><div className="stat-value">~<Money minor={upcomingTotal} currency={x.currency} /></div></div></Link>
+            <div className="stat"><span className={`stat-icon ${main.net < 0 ? 'bad' : 'accent'}`}><Scale size={22} aria-hidden="true" /></span><div><div className="stat-label">{m.dashboard.net}<Info label={t('What is left over?')}>{m.dashboard.netHelp}</Info></div><div className={`stat-value ${main.net < 0 ? 'neg' : ''}`}><Money minor={main.net} currency={x.currency} sign="exceptZero" /></div></div></div>
+            <Link to="/recurring" className="stat"><span className="stat-icon warn"><CalendarClock size={22} aria-hidden="true" /></span><div><div className="stat-label">{t('Bills in the next 30 days')}</div><div className="stat-value">~<Money minor={upcomingTotal} currency={x.currency} /></div></div></Link>
           </div>
           {x.hints.length > 0 && (
-            <section className="hints" aria-label="Worth knowing">
+            <section className="hints" aria-label={t('Worth knowing')}>
               {x.hints.map((h, k) => (
                 <Link key={k} className="hint-row" to={h.kind === 'category_up' ? `/transactions?category=${h.categoryId ?? 'none'}&from=${x.month}-01&to=${x.today}` : `/transactions?q=${encodeURIComponent(h.merchant)}`}>
                   <span className="hint-icon" aria-hidden="true"><Lightbulb size={18} /></span><span>{hintText(h)}</span><ChevronRight size={18} aria-hidden="true" className="muted" />
@@ -157,22 +159,22 @@ export function Dashboard() {
               ))}
             </section>
           )}
-          {others.length > 0 && <p className="help">{m.dashboard.otherCurrencies} {others.map((o) => <span key={o.currency} className="chip">{o.currency}: <Money minor={o.spending} currency={o.currency} /> spent</span>)}</p>}
+          {others.length > 0 && <p className="help">{m.dashboard.otherCurrencies} {others.map((o) => <span key={o.currency} className="chip">{o.currency}: <T s="{amount} spent" amount={<Money minor={o.spending} currency={o.currency} />} /></span>)}</p>}
 
           <div className="grid-2">
             <Card title={m.dashboard.byCategory} actions={<Link to="/reports">{m.dashboard.viewAll}</Link>}>
               {cats.length ? (
                 <div className="where">
-                  <Donut caption={m.dashboard.byCategory} currency={x.currency} centerLabel="Spent" selected={cat} onSelect={(k) => setCat(cat === k ? null : k)}
-                    rows={cats.map((c) => ({ key: c.categoryId ?? 'none', label: c.name, value: c.spending, dot: c.color }))} />
-                  <ul className="list" aria-label="Categories">
+                  <Donut caption={m.dashboard.byCategory} currency={x.currency} centerLabel={t('Spent')} selected={cat} onSelect={(k) => setCat(cat === k ? null : k)}
+                    rows={cats.map((c) => ({ key: c.categoryId ?? 'none', label: t(c.name), value: c.spending, dot: c.color }))} />
+                  <ul className="list" aria-label={m.nav.categories}>
                     {cats.slice(0, 6).map((c) => {
                       const k = c.categoryId ?? 'none';
                       return (
                         <li key={k}>
                           <button className={`item ${cat === k ? 'barlist-row on' : ''}`} aria-pressed={cat === k} onClick={() => setCat(cat === k ? null : k)}>
                             <CatIcon cat={c.categoryId ? byId.get(c.categoryId) ?? { color: c.color } : null} size={32} />
-                            <span className="item-text"><strong>{c.name}</strong><small className="muted">{c.count} payments</small></span>
+                            <span className="item-text"><strong>{t(c.name)}</strong><small className="muted">{t(c.count === 1 ? '{n} payment' : '{n} payments', { n: c.count })}</small></span>
                             <Money minor={c.spending} currency={x.currency} />
                           </button>
                         </li>
@@ -180,10 +182,10 @@ export function Dashboard() {
                     })}
                   </ul>
                 </div>
-              ) : <Empty art="chart" title="No spending yet this month">Your categories appear here as soon as payments come in.</Empty>}
+              ) : <Empty art="chart" title={t('No spending yet this month')}>{t('Your categories appear here as soon as payments come in.')}</Empty>}
             </Card>
-            <Card title={selected ? `${selected.name} this month` : m.dashboard.recent} actions={selected
-              ? <><button className="link small" onClick={() => setCat(null)}>Show all</button><Link to={`/transactions?category=${cat}&from=${x.month}-01&to=${x.today}&status=posted`}>{m.dashboard.viewAll}</Link></>
+            <Card title={selected ? t('{category} this month', { category: t(selected.name) }) : m.dashboard.recent} actions={selected
+              ? <><button className="link small" onClick={() => setCat(null)}>{t('Show all')}</button><Link to={`/transactions?category=${cat}&from=${x.month}-01&to=${x.today}&status=posted`}>{m.dashboard.viewAll}</Link></>
               : <Link to="/transactions">{m.dashboard.viewAll}</Link>}>
               {selected ? (catTx.data ? <TxList rows={catTx.data.rows} onOpen={(t) => nav(`/transactions?open=${t.id}`)} /> : <Loading />) : <TxList rows={x.recent.slice(0, 6)} onOpen={(t) => nav(`/transactions?open=${t.id}`)} />}
             </Card>
@@ -194,19 +196,19 @@ export function Dashboard() {
           </Card>
 
           <div className="grid-2">
-            <Card title={m.dashboard.balances} actions={<Link to="/accounts">Manage</Link>}>
+            <Card title={m.dashboard.balances} actions={<Link to="/accounts">{t('Manage')}</Link>}>
               <ul className="list">
                 {x.balances.map((b) => (
                   <li key={b.id} className="item">
                     <span className="stat-icon accent" style={{ width: 38, height: 38 }}><Wallet size={18} aria-hidden="true" /></span>
-                    <span className="item-text"><strong>{b.display_name ?? b.name}</strong><small className="muted">{b.balance_label ? `${b.balance_label} · ${fmt.ago(b.balance_at)}` : m.dashboard.noBalance}{!b.included && ' · not in totals'}</small></span>
+                    <span className="item-text"><strong>{b.display_name ?? b.name}</strong><small className="muted">{b.balance_label ? `${t(b.balance_label)} · ${fmt.ago(b.balance_at)}` : m.dashboard.noBalance}{!b.included && ` · ${t('not in totals')}`}</small></span>
                     <strong><Money minor={b.balance_minor} currency={b.currency} /></strong>
                   </li>
                 ))}
               </ul>
               {x.balanceHistory && x.balanceHistory.length > 1 && (
                 <div className="balance-chart">
-                  <h3 className="section-title">Balance, last 90 days <Info label="How is this worked out?">Worked back from the balance your bank reports, using your transactions. Current and savings accounts in totals only.</Info></h3>
+                  <h3 className="section-title">{t('Balance, last 90 days')} <Info label={t('How is this worked out?')}>{t('Worked back from the balance your bank reports, using your transactions. Current and savings accounts in totals only.')}</Info></h3>
                   <BalanceChart points={x.balanceHistory} currency={x.currency} />
                 </div>
               )}
@@ -219,7 +221,7 @@ export function Dashboard() {
                     <li key={u.id}>
                       <Link className="item" to="/recurring">
                         <Monogram name={u.merchant} />
-                        <span className="item-text"><strong>{u.merchant}</strong><small className="muted">{fmt.shortDate(u.next_date)} · {m.freqs[u.frequency]}{u.status === 'suggested' ? ' · to review' : ''}</small></span>
+                        <span className="item-text"><strong>{t(u.merchant)}</strong><small className="muted">{fmt.shortDate(u.next_date)} · {m.freqs[u.frequency]}{u.status === 'suggested' ? ` · ${t('to review')}` : ''}</small></span>
                         <span>~<Money minor={u.user_amount_minor ?? u.typical_amount_minor} currency={u.currency} /></span>
                         <ChevronRight size={18} aria-hidden="true" className="muted" />
                       </Link>

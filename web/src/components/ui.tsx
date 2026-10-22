@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CircleCheck, CircleAlert, TriangleAlert, Info as InfoIcon, X } from 'lucide-react';
 import type { ApiError } from '../api.ts';
-import { m } from '../i18n.ts';
+import { m, t, T } from '../i18n.ts';
 import { useSession } from '../state.tsx';
 import { Art, type ArtName } from './illustrations.tsx';
 
@@ -57,7 +57,7 @@ export function PageHeader({ title, subtitle, actions, info }: { title: ReactNod
   return (
     <header className="page-head">
       <div>
-        <h1>{title}{info && <Info label={`About ${typeof title === 'string' ? title : 'this page'}`}>{info}</Info>}</h1>
+        <h1>{title}{info && <Info label={t('About {page}', { page: typeof title === 'string' ? title : t('this page') })}>{info}</Info>}</h1>
         {subtitle && <p className="page-sub">{subtitle}</p>}
       </div>
       {actions && <div className="page-actions">{actions}</div>}
@@ -98,7 +98,8 @@ export function Help({ children }: { children: ReactNode }) {
 }
 
 /** Small ⓘ button that reveals an explanation, keeping screens uncluttered. */
-export function Info({ children, label = 'More information' }: { children: ReactNode; label?: string }) {
+export function Info({ children, label }: { children: ReactNode; label?: string }) {
+  label ??= t('More information');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   const id = useId();
@@ -157,7 +158,7 @@ export function Confirm({ open, title, text, confirmLabel, danger, typeToConfirm
       <div>{text}</div>
       {typeToConfirm && (
         <div className="field">
-          <label htmlFor={id}>Type <strong>{typeToConfirm}</strong> to confirm</label>
+          <label htmlFor={id}><T s="Type {phrase} to confirm" phrase={<strong>{typeToConfirm}</strong>} /></label>
           <input id={id} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
         </div>
       )}

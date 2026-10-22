@@ -1,5 +1,6 @@
 // Thin JSON client. All financial data stays in memory only (never localStorage).
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { t } from './i18n.ts';
 
 export class ApiError extends Error {
   status: number;
@@ -17,11 +18,11 @@ export async function api<T = unknown>(path: string, opts: { method?: string; bo
       body: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
     });
   } catch {
-    throw new ApiError(0, navigator.onLine ? 'Could not reach the Fluxo server. Is it running?' : 'You are offline. Changes were not saved; reconnect and try again.');
+    throw new ApiError(0, t(navigator.onLine ? 'Could not reach the Fluxo server. Is it running?' : 'You are offline. Changes were not saved; reconnect and try again.'));
   }
   const json = res.headers.get('content-type')?.includes('application/json') ? await res.json().catch(() => null) : null;
   if (res.status === 401) window.dispatchEvent(new Event('fluxo:unauthorized'));
-  if (!res.ok) throw new ApiError(res.status, (json as { error?: string } | null)?.error ?? `Request failed (${res.status}).`);
+  if (!res.ok) throw new ApiError(res.status, t((json as { error?: string } | null)?.error ?? 'Request failed ({status}).', { status: res.status }));
   return json as T;
 }
 

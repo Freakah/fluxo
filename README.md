@@ -30,6 +30,7 @@ All screenshots use synthetic demo data.
 - **To review**: new payments wait in a short queue; confirm each category with one tap (or swipe on a phone), change it, or mark them all as checked.
 - **Paid back**: link a friend’s MB WAY or transfer to the dinner it paid for, so only your share counts as spending.
 - **Gentle hints and a monthly recap**: one-line notes such as “Spotify went up from €7.99 to €8.99” or a category well above its usual month, and a five-card look back at last month. Computed locally; nothing is sent to AI services.
+- **English or Portuguese (Portugal)**: switch in Settings (or on the sign-in page). Dates and amounts follow the language, and the default category names switch too unless you renamed them.
 - **Easy to read**: text size setting (Normal / Large / Extra large), balance-over-time chart, details open as a bottom sheet on phones, and Fluxo can be installed as an app (its own window and icon).
 - **Activity**: grouped by day (day headers stay visible while you scroll); search, quick filter chips (account, dates, category, type, status, amount), sorting, detail view showing bank facts vs. your own labels, notes, bulk edits, exclusion from reports, undo.
 - **Categorization without AI services**: your corrections → your rules → known merchants / card codes → description keywords → Uncategorized. Every category shows *why* and *how confident*. Rule preview before applying to history.

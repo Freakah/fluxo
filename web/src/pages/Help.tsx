@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { Compass, ShieldCheck, Keyboard, LifeBuoy } from 'lucide-react';
-import { m } from '../i18n.ts';
+import { m, t, T } from '../i18n.ts';
 import { Card, PageHeader } from '../components/ui.tsx';
 import { Art } from '../components/illustrations.tsx';
 
@@ -20,28 +20,28 @@ const FAQ: [string, string][] = [
 export function Help() {
   return (
     <div className="page">
-      <PageHeader title={m.nav.help} subtitle="Answers to common questions, and a quick tour of the app." />
+      <PageHeader title={m.nav.help} subtitle={t('Answers to common questions, and a quick tour of the app.')} />
       <section className="card help-hero">
         <div className="stack">
-          <h2>New here?</h2>
-          <p className="muted">The tour points out each part of Fluxo in under a minute.</p>
-          <div><button className="btn btn-primary" onClick={() => dispatchEvent(new Event('fluxo:tour'))}><Compass size={18} aria-hidden="true" />Take the tour</button></div>
+          <h2>{t('New here?')}</h2>
+          <p className="muted">{t('The tour points out each part of Fluxo in under a minute.')}</p>
+          <div><button className="btn btn-primary" onClick={() => dispatchEvent(new Event('fluxo:tour'))}><Compass size={18} aria-hidden="true" />{t('Take the tour')}</button></div>
         </div>
         <Art.welcome />
       </section>
       <div className="grid-2">
-        <Card title="Common questions" icon={<LifeBuoy size={18} />}>
-          {FAQ.map(([q, a]) => <details key={q} className="faq"><summary>{q}</summary><p>{a}</p></details>)}
+        <Card title={t('Common questions')} icon={<LifeBuoy size={18} />}>
+          {FAQ.map(([q, a]) => <details key={q} className="faq"><summary>{t(q)}</summary><p>{t(a)}</p></details>)}
         </Card>
         <div className="stack">
           <Card title={m.accounts.coverage} icon={<ShieldCheck size={18} />}><ul className="bullets">{m.accounts.coverageText.map((t) => <li key={t}>{t}</li>)}</ul></Card>
-          <Card title="Keyboard shortcuts" icon={<Keyboard size={18} />}>
+          <Card title={t('Keyboard shortcuts')} icon={<Keyboard size={18} />}>
             <ul className="list">
-              <li className="list-row"><span>Search or jump to a page</span><kbd>Ctrl K</kbd></li>
-              <li className="list-row"><span>Search your activity</span><kbd>/</kbd></li>
-              <li className="list-row"><span>Close a window</span><kbd>Esc</kbd></li>
+              <li className="list-row"><span>{t('Search or jump to a page')}</span><kbd>Ctrl K</kbd></li>
+              <li className="list-row"><span>{t('Search your activity')}</span><kbd>/</kbd></li>
+              <li className="list-row"><span>{t('Close a window')}</span><kbd>Esc</kbd></li>
             </ul>
-            <p className="help">Something else? See <Link to="/settings">Settings</Link> or the project README.</p>
+            <p className="help"><T s="Something else? See {settings} or the project README." settings={<Link to="/settings">{m.nav.settings}</Link>} /></p>
           </Card>
         </div>
       </div>

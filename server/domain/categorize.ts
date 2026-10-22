@@ -20,6 +20,14 @@ export const DEFAULT_CATEGORIES: { key: CategoryKey; name: string; color: string
   { key: 'uncategorized', name: 'Uncategorized', color: '#9e9e9e' },
 ];
 
+/** Portuguese names for the default categories, used when the interface language changes. */
+export const PT_CATEGORY_NAMES: Record<CategoryKey, string> = {
+  groceries: 'Supermercado', restaurants: 'Restaurantes e cafés', transport: 'Transportes', fuel: 'Combustível', housing: 'Casa',
+  utilities: 'Água, luz e gás', shopping: 'Compras', entertainment: 'Lazer e jogos', subscriptions: 'Subscrições', health: 'Saúde',
+  education: 'Educação', travel: 'Viagens', bank_fees: 'Comissões bancárias', cash: 'Levantamentos', income: 'Rendimentos',
+  other: 'Outros', uncategorized: 'Sem categoria',
+};
+
 export type TxType = 'expense' | 'income' | 'refund' | 'transfer';
 export type Source = 'rule' | 'merchant' | 'mcc' | 'bank_code' | 'description' | 'none';
 export type Confidence = 'high' | 'medium' | 'low' | 'none';

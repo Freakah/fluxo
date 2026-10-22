@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { Search, Plus, Download, SlidersHorizontal, ListChecks, Hourglass, Ban, Undo2, ArrowLeftRight, ArrowDownLeft, EyeOff, PencilLine, CircleHelp, Sparkles, RotateCcw, HandCoins, Unlink } from 'lucide-react';
 import { api, useAction, useApi } from '../api.ts';
-import { m } from '../i18n.ts';
+import { m, t as tr, T } from '../i18n.ts';
 import { useCategories, useSession, useToast } from '../state.tsx';
 import { Badge, Card, Empty, ErrorBox, Loading, Money, Modal, Field, PageHeader, Switch } from '../components/ui.tsx';
 import { CatIcon } from '../components/icons.tsx';
@@ -21,37 +21,37 @@ export function txBadges(t: Tx) {
       {t.type === 'refund' && <Badge tone="ok" icon={<Undo2 size={S} />}>{m.types.refund}</Badge>}
       {t.type === 'transfer' && <Badge tone="info" icon={<ArrowLeftRight size={S} />}>{m.types.transfer}</Badge>}
       {t.type === 'income' && <Badge tone="ok" icon={<ArrowDownLeft size={S} />}>{m.types.income}</Badge>}
-      {!!t.excluded && <Badge tone="muted" icon={<EyeOff size={S} />}>Not counted</Badge>}
+      {!!t.excluded && <Badge tone="muted" icon={<EyeOff size={S} />}>{tr('Not counted')}</Badge>}
       {t.source === 'manual' && <Badge tone="info" icon={<PencilLine size={S} />}>{m.tx.manual}</Badge>}
       {t.needs_review && <Badge tone="warn" icon={<CircleHelp size={S} />}>{m.tx.review}</Badge>}
-      {!!t.paid_back_minor && <Badge tone="ok" icon={<HandCoins size={S} />}><Money minor={t.paid_back_minor} currency={t.currency} /> paid back</Badge>}
-      {t.original_pending_amount_minor !== null && <Badge tone="muted">amount changed</Badge>}
+      {!!t.paid_back_minor && <Badge tone="ok" icon={<HandCoins size={S} />}><T s="{amount} paid back" amount={<Money minor={t.paid_back_minor} currency={t.currency} />} /></Badge>}
+      {t.original_pending_amount_minor !== null && <Badge tone="muted">{tr('amount changed')}</Badge>}
     </>
   );
 }
 
 function dayLabel(d: string, today: string, fmt: ReturnType<typeof useSession>['fmt']) {
-  if (d === today) return 'Today';
-  if (d === addDays(today, -1)) return 'Yesterday';
+  if (d === today) return tr('Today');
+  if (d === addDays(today, -1)) return tr('Yesterday');
   return fmt.date(d);
 }
 
 export function TxList({ rows, selected, onToggle, onOpen, grouped }: { rows: Tx[]; selected?: Set<number>; onToggle?: (id: number) => void; onOpen?: (t: Tx) => void; grouped?: boolean }) {
   const { fmt, settings } = useSession();
   const { byId } = useCategories();
-  if (!rows.length) return <Empty art="search" title={m.tx.none}>Try another search or clear the filters.</Empty>;
+  if (!rows.length) return <Empty art="search" title={m.tx.none}>{tr('Try another search or clear the filters.')}</Empty>;
   const today = todayIn(settings.timezone);
   const row = (t: Tx) => {
     const cat = t.category_id ? byId.get(t.category_id) ?? { color: t.category_color } : null;
     return (
       <li key={t.id} className={`tx ${t.status !== 'posted' ? 'tx-' + t.status : ''} ${t.excluded ? 'tx-excluded' : ''}`}>
-        {onToggle && <span className="tx-check"><input type="checkbox" aria-label={`Select ${t.merchant} ${fmt.date(t.booking_date)}`} checked={selected?.has(t.id) ?? false} onChange={() => onToggle(t.id)} /></span>}
-        <button className="tx-main" onClick={() => onOpen?.(t)} disabled={!onOpen} aria-label={onOpen ? `Open ${t.merchant}, ${fmt.date(t.booking_date)}` : undefined}>
+        {onToggle && <span className="tx-check"><input type="checkbox" aria-label={tr('Select {merchant} {date}', { merchant: tr(t.merchant), date: fmt.date(t.booking_date) })} checked={selected?.has(t.id) ?? false} onChange={() => onToggle(t.id)} /></span>}
+        <button className="tx-main" onClick={() => onOpen?.(t)} disabled={!onOpen} aria-label={onOpen ? tr('Open {merchant}, {date}', { merchant: tr(t.merchant), date: fmt.date(t.booking_date) }) : undefined}>
           <CatIcon cat={cat} transfer={t.type === 'transfer'} size={40} />
           <span className="tx-text">
-            <span className="tx-merchant">{t.merchant}</span>
+            <span className="tx-merchant">{tr(t.merchant)}</span>
             <span className="tx-sub">
-              {t.type !== 'transfer' && <span className="cat">{t.category_name ?? 'Uncategorized'}{t.confidence === 'low' && ' · check'}</span>}
+              {t.type !== 'transfer' && <span className="cat">{t.category_name ?? tr('Uncategorized')}{t.confidence === 'low' && ` · ${tr('check')}`}</span>}
               <span>· {grouped ? t.account_display_name ?? t.account_name : fmt.shortDate(t.booking_date)}</span>
             </span>
           </span>
@@ -166,7 +166,7 @@ export function Transactions() {
       await api('/transactions/bulk', { method: 'POST', body: { ids, patch } });
       setSelected(new Set());
       await list.reload(true);
-      toast(`${label}: ${ids.length}`, { action: { label: m.common.undo, run: async () => {
+      toast(`${tr(label)}: ${ids.length}`, { action: { label: m.common.undo, run: async () => {
         // Undo restores each row's previous user-layer values.
         for (const b of before) await api(`/transactions/${b.id}`, { method: 'PATCH', body: 'categoryId' in patch ? { categoryId: b.category_source === 'user' ? b.category_id : null } : { excluded: !!b.excluded } });
         await list.reload(true);
@@ -180,7 +180,7 @@ export function Transactions() {
 
   return (
     <div className="page">
-      <PageHeader title={m.tx.title} subtitle="Every payment in and out, newest first." actions={<>
+      <PageHeader title={m.tx.title} subtitle={tr('Every payment in and out, newest first.')} actions={<>
         <a className="btn" href={`/api/transactions/export.csv?${filterQs}`} title={m.tx.exportHelp} download><Download size={18} aria-hidden="true" />{m.tx.export}</a>
         <button className="btn btn-primary" onClick={() => setCashOpen(true)}><Plus size={18} aria-hidden="true" />{m.tx.addCash}</button>
       </>} />
@@ -194,30 +194,30 @@ export function Transactions() {
           </div>
           <label className="sr-only" htmlFor="sort">{m.tx.sort}</label>
           <select id="sort" className="chip-select" value={sp.get('sort') ?? 'date_desc'} onChange={(e) => setF('sort', e.target.value === 'date_desc' ? '' : e.target.value)}>
-            <option value="date_desc">Newest first</option><option value="date_asc">Oldest first</option><option value="amount_desc">Largest amount</option><option value="amount_asc">Smallest amount</option>
+            <option value="date_desc">{tr('Newest first')}</option><option value="date_asc">{tr('Oldest first')}</option><option value="amount_desc">{tr('Largest amount')}</option><option value="amount_asc">{tr('Smallest amount')}</option>
           </select>
         </div>
         <div className="chips">
           <select aria-label={m.tx.category} className={`chip-select ${sp.get('category') ? 'set' : ''}`} value={sp.get('category') ?? ''} onChange={(e) => setF('category', e.target.value)}>
-            <option value="">All categories</option><option value="none">Uncategorized</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}{c.archived_at ? ' (archived)' : ''}</option>)}
+            <option value="">{tr('All categories')}</option><option value="none">{tr('Uncategorized')}</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}{c.archived_at ? ` (${tr('archived')})` : ''}</option>)}
           </select>
-          <select aria-label="Date" className={`chip-select ${preset !== 'any' ? 'set' : ''}`} value={preset} onChange={(e) => setDates(e.target.value)}>
-            <option value="any">Any time</option><option value="month">This month</option><option value="last">Last month</option><option value="3m">Last 3 months</option><option value="custom">Custom dates…</option>
+          <select aria-label={tr('Date')} className={`chip-select ${preset !== 'any' ? 'set' : ''}`} value={preset} onChange={(e) => setDates(e.target.value)}>
+            <option value="any">{tr('Any time')}</option><option value="month">{tr('This month')}</option><option value="last">{tr('Last month')}</option><option value="3m">{tr('Last 3 months')}</option><option value="custom">{tr('Custom dates…')}</option>
           </select>
           {(accts.data?.length ?? 0) > 1 && (
             <select aria-label={m.tx.account} className={`chip-select ${sp.get('accounts') ? 'set' : ''}`} value={sp.get('accounts') ?? ''} onChange={(e) => setF('accounts', e.target.value)}>
-              <option value="">All accounts</option>{accts.data?.map((a) => <option key={a.id} value={a.id}>{a.display_name ?? a.name}</option>)}
+              <option value="">{tr('All accounts')}</option>{accts.data?.map((a) => <option key={a.id} value={a.id}>{a.display_name ?? a.name}</option>)}
             </select>
           )}
           <select aria-label={m.tx.status} className={`chip-select ${sp.get('status') ? 'set' : ''}`} value={sp.get('status') ?? ''} onChange={(e) => setF('status', e.target.value)}>
-            <option value="">Any status</option>{Object.entries(m.statuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            <option value="">{tr('Any status')}</option>{Object.entries(m.statuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <button className={`chip-btn ${advancedCount ? 'on' : ''}`} aria-expanded={showFilters} aria-controls="filters" onClick={() => setShowFilters(!showFilters)}>
             <SlidersHorizontal size={16} aria-hidden="true" />{m.tx.filters}{advancedCount ? ` (${advancedCount})` : ''}
           </button>
           {anyFilter && <button className="link small" onClick={() => { setQ(''); setSp(new URLSearchParams(), { replace: true }); }}>{m.tx.clear}</button>}
           <span className="spacer" />
-          <button className="chip-btn" aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setSelected(new Set()); }}><ListChecks size={16} aria-hidden="true" />Select</button>
+          <button className="chip-btn" aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setSelected(new Set()); }}><ListChecks size={16} aria-hidden="true" />{tr('Select')}</button>
         </div>
         {showFilters && (
           <div id="filters" className="filters card">
@@ -226,14 +226,14 @@ export function Transactions() {
             <Field label={m.tx.type}>{(id) => <select id={id} value={sp.get('type') ?? ''} onChange={(e) => setF('type', e.target.value)}><option value="">{m.common.all}</option>{Object.entries(m.types).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>}</Field>
             <Field label={`${m.tx.min} (${settings.currency})`}>{(id) => <input id={id} inputMode="decimal" pattern="\d+(\.\d{1,2})?" value={sp.get('min') ?? ''} onChange={(e) => setF('min', e.target.value.replace(',', '.'))} />}</Field>
             <Field label={`${m.tx.max} (${settings.currency})`}>{(id) => <input id={id} inputMode="decimal" pattern="\d+(\.\d{1,2})?" value={sp.get('max') ?? ''} onChange={(e) => setF('max', e.target.value.replace(',', '.'))} />}</Field>
-            <Field label="Counted in reports">{(id) => <select id={id} value={sp.get('excluded') ?? ''} onChange={(e) => setF('excluded', e.target.value)}><option value="">{m.common.all}</option><option value="hide">Only counted</option><option value="only">Only not counted</option></select>}</Field>
+            <Field label={tr('Counted in reports')}>{(id) => <select id={id} value={sp.get('excluded') ?? ''} onChange={(e) => setF('excluded', e.target.value)}><option value="">{m.common.all}</option><option value="hide">{tr('Only counted')}</option><option value="only">{tr('Only not counted')}</option></select>}</Field>
             <div className="field"><Switch checked={sp.get('review') === '1'} onChange={(v) => setF('review', v ? '1' : '')} label={m.tx.review} /></div>
           </div>
         )}
       </div>
 
       {selected.size > 0 && (
-        <div className="bulkbar" role="region" aria-label="Bulk actions">
+        <div className="bulkbar" role="region" aria-label={tr('Bulk actions')}>
           <strong>{selected.size} {m.tx.selected}</strong>
           <label className="sr-only" htmlFor="bulkcat">{m.tx.bulkCategory}</label>
           <select id="bulkcat" defaultValue="" disabled={bulk.busy} onChange={(e) => { if (e.target.value) void bulkPatch({ categoryId: Number(e.target.value) }, 'Category set'); e.target.value = ''; }}>
@@ -251,11 +251,11 @@ export function Transactions() {
         {!list.data && !list.error && <Loading rows={6} />}
         {list.data && (
           <>
-            <p className="muted small" aria-live="polite" style={{ margin: '0 .5rem .25rem' }}>{list.data.total} transactions{list.loading ? ' · updating…' : ''}
-              {selecting && list.data.rows.length > 0 && <> · <button className="link" onClick={() => setSelected(selected.size ? new Set() : new Set(list.data!.rows.map((r) => r.id)))}>{selected.size ? 'Clear selection' : 'Select all shown'}</button></>}</p>
+            <p className="muted small" aria-live="polite" style={{ margin: '0 .5rem .25rem' }}>{tr(list.data.total === 1 ? '{n} transaction' : '{n} transactions', { n: list.data.total })}{list.loading ? ` · ${tr('updating…')}` : ''}
+              {selecting && list.data.rows.length > 0 && <> · <button className="link" onClick={() => setSelected(selected.size ? new Set() : new Set(list.data!.rows.map((r) => r.id)))}>{selected.size ? tr('Clear selection') : tr('Select all shown')}</button></>}</p>
             <TxList rows={list.data.rows} grouped={!sp.get('sort') || sp.get('sort')?.startsWith('date')} selected={selected} onToggle={selecting ? toggle : undefined} onOpen={(t) => setOpen(t.id)} />
             <div ref={sentinel} />
-            {hasMore && <button className="btn load-more" disabled={moreAction.busy} onClick={loadMore}>{moreAction.busy ? m.common.loading : `${m.tx.loadMore} (${list.data.total - list.data.rows.length} more)`}</button>}
+            {hasMore && <button className="btn load-more" disabled={moreAction.busy} onClick={loadMore}>{moreAction.busy ? m.common.loading : `${m.tx.loadMore} (${tr('{n} more', { n: list.data.total - list.data.rows.length })})`}</button>}
           </>
         )}
       </Card>
@@ -315,7 +315,7 @@ function TxDetail({ id, categories, onClose }: { id: number; categories: Categor
       const prev = { categoryId: t.category_override_id, type: t.type_override, note: t.note, excluded: !!t.excluded };
       await api(`/transactions/${id}`, { method: 'PATCH', body: { categoryId: form.categoryId, type: form.type, note: form.note || null, excluded: form.excluded } });
       if (remember && ruleBody) await api('/rules', { method: 'POST', body: ruleBody });
-      toast(remember ? 'Saved and rule created' : m.common.saved, { action: remember ? undefined : { label: m.common.undo, run: () => { void api(`/transactions/${id}`, { method: 'PATCH', body: prev }).then(() => onClose(true)); } } });
+      toast(remember ? tr('Saved and rule created') : m.common.saved, { action: remember ? undefined : { label: m.common.undo, run: () => { void api(`/transactions/${id}`, { method: 'PATCH', body: prev }).then(() => onClose(true)); } } });
       onClose(true);
     } catch (e) { toast((e as Error).message, { kind: 'error' }); }
   });
@@ -323,7 +323,7 @@ function TxDetail({ id, categories, onClose }: { id: number; categories: Categor
   const autoCat = categories.find((c) => c.id === t?.auto_category_id);
   const shownCat = form?.categoryId ? byId.get(form.categoryId) : autoCat;
   return (
-    <Modal open side title={t ? t.merchant : m.common.loading} onClose={close} footer={t && <><button className="btn" onClick={close}>{m.common.cancel}</button><button className="btn btn-primary" disabled={!dirty || save.busy} onClick={submit}>{save.busy ? m.common.loading : m.common.save}</button></>}>
+    <Modal open side title={t ? tr(t.merchant) : m.common.loading} onClose={close} footer={t && <><button className="btn" onClick={close}>{m.common.cancel}</button><button className="btn btn-primary" disabled={!dirty || save.busy} onClick={submit}>{save.busy ? m.common.loading : m.common.save}</button></>}>
       {d.error && <ErrorBox error={d.error} />}
       {!t || !form ? <Loading /> : (
         <>
@@ -336,7 +336,7 @@ function TxDetail({ id, categories, onClose }: { id: number; categories: Categor
 
           <h3 className="section-title" id="cat-label">{m.tx.category}</h3>
           <div className="explain"><Sparkles size={16} aria-hidden="true" /><span>{t.category_override_id ? m.sources.user : m.sources[t.auto_source]}{t.rule && <> (“{t.rule.pattern}”)</>} · {m.confidence[t.category_override_id ? 'certain' : t.auto_confidence]}</span></div>
-          <CategoryPicker label={m.tx.category} categories={categories.filter((c) => !c.archived_at || c.id === form.categoryId)} value={form.categoryId} onChange={(v) => setForm({ ...form, categoryId: v })} autoLabel={`Automatic (${autoCat?.name ?? 'Uncategorized'})`} />
+          <CategoryPicker label={m.tx.category} categories={categories.filter((c) => !c.archived_at || c.id === form.categoryId)} value={form.categoryId} onChange={(v) => setForm({ ...form, categoryId: v })} autoLabel={`${tr('Automatic')} (${autoCat?.name ?? tr('Uncategorized')})`} />
           {form.categoryId && (
             <div className="field">
               <Switch checked={remember} onChange={setRemember} label={<>{m.tx.remember} (“{t.merchant}”)</>} />
@@ -346,7 +346,7 @@ function TxDetail({ id, categories, onClose }: { id: number; categories: Categor
 
           {t.type !== 'transfer' && <SharedCost t={t} onChanged={() => onClose(true)} />}
 
-          <h3 className="section-title">More options</h3>
+          <h3 className="section-title">{tr('More options')}</h3>
           <Field label={m.tx.note}>{(fid) => <textarea id={fid} maxLength={500} rows={2} placeholder={m.tx.notePlaceholder} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />}</Field>
           <Field label={m.tx.typeOverride}>{(fid) => (
             <select id={fid} value={form.type ?? ''} onChange={(e) => setForm({ ...form, type: e.target.value || null })}>
@@ -366,9 +366,9 @@ function TxDetail({ id, categories, onClose }: { id: number; categories: Categor
               {t.original_pending_amount_minor !== null && <><dt>{m.tx.pendingOriginal}</dt><dd><Money minor={t.original_pending_amount_minor} currency={t.currency} /></dd></>}
               <dt>{m.tx.status}</dt><dd>{m.statuses[t.status]}</dd>
               <dt>{m.tx.bookingDate}</dt><dd>{fmt.date(t.booking_date)}</dd>
-              <dt>{m.tx.valueDate}</dt><dd>{t.value_date ? fmt.date(t.value_date) : 'Not supplied'}</dd>
+              <dt>{m.tx.valueDate}</dt><dd>{t.value_date ? fmt.date(t.value_date) : tr('Not supplied')}</dd>
               <dt>{m.tx.original}</dt><dd className="mono">{t.description}</dd>
-              {t.counterparty && <><dt>Counterparty</dt><dd>{t.counterparty}</dd></>}
+              {t.counterparty && <><dt>{tr('Counterparty')}</dt><dd>{t.counterparty}</dd></>}
               <dt>{m.tx.account}</dt><dd>{t.account_display_name ?? t.account_name}</dd>
               {t.needs_review && <><dt>{m.tx.review}</dt><dd>{t.needs_review}</dd></>}
               {t.peer && <><dt>{m.tx.transferWith}</dt><dd>{t.peer.account_name}, {fmt.date(t.peer.booking_date)}, <Money minor={t.peer.amount_minor} currency={t.peer.currency} sign="always" /></dd></>}
@@ -390,20 +390,20 @@ function CashEntry({ open, categories, onClose }: { open: boolean; categories: C
     try {
       const amt = f.amount.replace(',', '.').trim();
       await api('/transactions/manual', { method: 'POST', body: { date: f.date, amount: amt.startsWith('-') ? amt : `-${amt}`, description: f.description, categoryId: f.categoryId } });
-      toast('Cash payment added'); setF({ date: today, amount: '', description: '', categoryId: null }); onClose(true);
+      toast(tr('Cash payment added')); setF({ date: today, amount: '', description: '', categoryId: null }); onClose(true);
     } catch (e) { toast((e as Error).message, { kind: 'error' }); }
   });
   return (
-    <Modal open={open} title="Add a cash payment" onClose={() => onClose(false)} footer={<><button className="btn" onClick={() => onClose(false)}>{m.common.cancel}</button><button className="btn btn-primary" disabled={busy || !f.amount || !f.description} onClick={submit}>{m.common.save}</button></>}>
+    <Modal open={open} title={tr('Add a cash payment')} onClose={() => onClose(false)} footer={<><button className="btn" onClick={() => onClose(false)}>{m.common.cancel}</button><button className="btn btn-primary" disabled={busy || !f.amount || !f.description} onClick={submit}>{m.common.save}</button></>}>
       <p className="help" style={{ marginTop: 0 }}>{m.tx.cashHelp}</p>
-      <Field label="Amount spent" hint="For example 4.50">{(id, d) => <div className="amount-input"><span aria-hidden="true">{fmt.currencySymbol()}</span><input id={id} aria-describedby={d} inputMode="decimal" placeholder="0.00" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></div>}</Field>
+      <Field label={tr('Amount spent')} hint={tr('For example 4.50')}>{(id, d) => <div className="amount-input"><span aria-hidden="true">{fmt.currencySymbol()}</span><input id={id} aria-describedby={d} inputMode="decimal" placeholder="0.00" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></div>}</Field>
       <div className="form-grid">
-        <Field label="What was it for?">{(id) => <input id={id} maxLength={140} placeholder="Coffee at the market" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />}</Field>
-        <Field label="Date">{(id) => <input id={id} type="date" value={f.date} max={today} onChange={(e) => setF({ ...f, date: e.target.value })} />}</Field>
+        <Field label={tr('What was it for?')}>{(id) => <input id={id} maxLength={140} placeholder={tr('Coffee at the market')} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />}</Field>
+        <Field label={tr('Date')}>{(id) => <input id={id} type="date" value={f.date} max={today} onChange={(e) => setF({ ...f, date: e.target.value })} />}</Field>
       </div>
       <h3 className="section-title">{m.tx.category}</h3>
-      <CategoryPicker label={m.tx.category} categories={categories.filter((c) => c.key !== 'income')} value={f.categoryId} onChange={(v) => setF({ ...f, categoryId: v })} autoLabel="Automatic" />
-      <button type="button" className="link small" onClick={() => setF({ date: today, amount: '', description: '', categoryId: null })} style={{ alignSelf: 'flex-start' }}><RotateCcw size={14} aria-hidden="true" /> Clear</button>
+      <CategoryPicker label={m.tx.category} categories={categories.filter((c) => c.key !== 'income')} value={f.categoryId} onChange={(v) => setF({ ...f, categoryId: v })} autoLabel={tr('Automatic')} />
+      <button type="button" className="link small" onClick={() => setF({ date: today, amount: '', description: '', categoryId: null })} style={{ alignSelf: 'flex-start' }}><RotateCcw size={14} aria-hidden="true" /> {tr('Clear')}</button>
     </Modal>
   );
 }
@@ -414,19 +414,19 @@ function SharedCost({ t, onChanged }: { t: Detail; onChanged: () => void }) {
   const toast = useToast();
   const [picking, setPicking] = useState(false);
   const unlink = (expenseId: number, incomingId: number) => api('/paid-back', { method: 'PUT', body: { expenseId, incomingId, linked: false } })
-    .then(() => { toast('Link removed'); onChanged(); }).catch((e: Error) => toast(e.message, { kind: 'error' }));
+    .then(() => { toast(tr('Link removed')); onChanged(); }).catch((e: Error) => toast(e.message, { kind: 'error' }));
   const share = t.amount_minor + (t.paid_back_minor ?? 0);
   return (
     <>
       <h3 className="section-title">{m.paidBack.title}</h3>
       {t.paidBackFor ? (
-        <div className="explain"><HandCoins size={16} aria-hidden="true" /><span>This money paid back <strong>{t.paidBackFor.merchant}</strong> on {fmt.date(t.paidBackFor.booking_date)} (<Money minor={t.paidBackFor.amount_minor} currency={t.currency} />). It lowers that spending instead of counting as income.
-          {' '}<button className="link" onClick={() => unlink(t.paidBackFor!.id, t.id)}><Unlink size={14} aria-hidden="true" /> Remove link</button></span></div>
+        <div className="explain"><HandCoins size={16} aria-hidden="true" /><span><T s="This money paid back {merchant} on {date} ({amount}). It lowers that spending instead of counting as income." merchant={<strong>{tr(t.paidBackFor.merchant)}</strong>} date={fmt.date(t.paidBackFor.booking_date)} amount={<Money minor={t.paidBackFor.amount_minor} currency={t.currency} />} />
+          {' '}<button className="link" onClick={() => unlink(t.paidBackFor!.id, t.id)}><Unlink size={14} aria-hidden="true" /> {tr('Remove link')}</button></span></div>
       ) : t.paidBackBy.length ? (
         <div className="stack" style={{ gap: '.4rem' }}>
-          <div className="explain"><HandCoins size={16} aria-hidden="true" /><span>You paid <Money minor={-t.amount_minor} currency={t.currency} />, got <Money minor={t.paid_back_minor ?? 0} currency={t.currency} /> back. <strong>Your share: <Money minor={-share} currency={t.currency} /></strong></span></div>
-          {t.paidBackBy.map((p) => <div key={p.id} className="row small"><span>{p.merchant}, {fmt.date(p.booking_date)}: <Money minor={p.amount_minor} currency={p.currency} sign="always" /></span><button className="link" onClick={() => unlink(t.id, p.id)}><Unlink size={14} aria-hidden="true" /> Remove</button></div>)}
-          {share < 0 && <button className="link" style={{ alignSelf: 'flex-start' }} onClick={() => setPicking(true)}>Add another payment back</button>}
+          <div className="explain"><HandCoins size={16} aria-hidden="true" /><span><T s="You paid {paid}, got {back} back." paid={<Money minor={-t.amount_minor} currency={t.currency} />} back={<Money minor={t.paid_back_minor ?? 0} currency={t.currency} />} /> <strong><T s="Your share: {amount}" amount={<Money minor={-share} currency={t.currency} />} /></strong></span></div>
+          {t.paidBackBy.map((p) => <div key={p.id} className="row small"><span>{tr(p.merchant)}, {fmt.date(p.booking_date)}: <Money minor={p.amount_minor} currency={p.currency} sign="always" /></span><button className="link" onClick={() => unlink(t.id, p.id)}><Unlink size={14} aria-hidden="true" /> {tr('Remove')}</button></div>)}
+          {share < 0 && <button className="link" style={{ alignSelf: 'flex-start' }} onClick={() => setPicking(true)}>{tr('Add another payment back')}</button>}
         </div>
       ) : (
         <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setPicking(true)}><HandCoins size={18} aria-hidden="true" />{t.amount_minor > 0 ? m.paidBack.thisPaidBack : m.paidBack.someonePaid}</button>
@@ -447,7 +447,7 @@ export function PaidBackPicker({ tx: t, onClose }: { tx: Tx; onClose: (changed: 
   const save = () => pick && run(async () => {
     try {
       await api('/paid-back', { method: 'PUT', body: incoming ? { expenseId: pick, incomingId: t.id, linked: true } : { expenseId: t.id, incomingId: pick, linked: true } });
-      toast('Linked. Only your share counts as spending now.');
+      toast(tr('Linked. Only your share counts as spending now.'));
       onClose(true);
     } catch (e) { toast((e as Error).message, { kind: 'error' }); }
   });
@@ -456,11 +456,11 @@ export function PaidBackPicker({ tx: t, onClose }: { tx: Tx; onClose: (changed: 
       <p className="help" style={{ marginTop: 0 }}>{incoming ? m.paidBack.pickExpense : m.paidBack.pickIncoming}</p>
       {c.error && <ErrorBox error={c.error} />}
       {!c.data ? <Loading /> : !c.data.length ? <Empty art="search" title={m.paidBack.none} /> : (
-        <div className="pick-list" role="radiogroup" aria-label={incoming ? 'Payments you made' : 'Money you received'}>
+        <div className="pick-list" role="radiogroup" aria-label={tr(incoming ? 'Payments you made' : 'Money you received')}>
           {c.data.map((x) => (
             <button key={x.id} type="button" role="radio" aria-checked={pick === x.id} className="pick-item" onClick={() => setPick(x.id)}>
               <span className="pick-dot" aria-hidden="true" />
-              <span className="item-text"><strong>{x.merchant}</strong><small className="muted">{fmt.date(x.booking_date)}{x.category_name ? ` · ${x.category_name}` : ''}</small></span>
+              <span className="item-text"><strong>{tr(x.merchant)}</strong><small className="muted">{fmt.date(x.booking_date)}{x.category_name ? ` · ${x.category_name}` : ''}</small></span>
               <Money minor={x.amount_minor} currency={x.currency} sign="always" />
             </button>
           ))}

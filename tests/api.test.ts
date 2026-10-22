@@ -354,5 +354,16 @@ describe('review inbox, paid back and highlights', () => {
     expect((await c.get('/api/recap?month=2026-13')).status).toBe(400);
     expect((await c.put('/api/me/settings', { recapSeen: '2026-09', textSize: 'large' })).json).toMatchObject({ recapSeen: '2026-09', textSize: 'large' });
     expect((await c.put('/api/me/settings', { textSize: 'huge' })).status).toBe(400);
+
+    // Default category names follow the interface language; names the user changed are left alone.
+    const cats = async () => (await c.get('/api/categories')).json as { id: number; key: string | null; name: string }[];
+    const shop = (await cats()).find((x) => x.key === 'shopping')!;
+    await c.patch(`/api/categories/${shop.id}`, { name: 'Lojas' });
+    expect((await c.put('/api/me/settings', { language: 'pt' })).json.language).toBe('pt');
+    const ptNames = Object.fromEntries((await cats()).map((x) => [x.key, x.name]));
+    expect(ptNames).toMatchObject({ groceries: 'Supermercado', uncategorized: 'Sem categoria', shopping: 'Lojas' });
+    await c.put('/api/me/settings', { language: 'en' });
+    expect(Object.fromEntries((await cats()).map((x) => [x.key, x.name]))).toMatchObject({ groceries: 'Groceries', shopping: 'Lojas' });
+    expect((await c.put('/api/me/settings', { language: 'fr' })).status).toBe(400);
   });
 });

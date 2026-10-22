@@ -24,7 +24,7 @@ export function authRoutes(deps: Deps) {
   const app = new Hono<Env>();
   const loginLimiter = createLimiter(10, 15 * 60_000); // per IP
   const accountLimiter = createLimiter(5, 15 * 60_000); // per email
-  const demoLimiter = createLimiter(20, 60 * 60_000);
+  const demoLimiter = createLimiter(config.DEMO_PER_HOUR, 60 * 60_000);
   const ua = (c: Context) => c.req.header('user-agent') ?? null;
   const limit = (c: Context, limiter: ReturnType<typeof createLimiter>, key: string) => {
     const wait = limiter.take(key);
