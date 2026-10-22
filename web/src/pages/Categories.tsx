@@ -32,16 +32,16 @@ export function Categories() {
       <Help>{m.categories.precedence}</Help>
       <Card title={m.categories.rules} actions={<button className="btn btn-primary btn-small" onClick={() => setEditRule({ field: 'merchant', match_type: 'contains', direction: 'out', priority: 100, enabled: 1 })}>{m.categories.addRule}</button>}>
         {rules.data.length === 0 ? <p className="muted">No rules yet. Create one here, or tick “{m.tx.remember}” when correcting a transaction.</p> : (
-          <div className="table-wrap"><table className="table">
+          <div className="table-wrap"><table className="table stack">
             <caption className="sr-only">Categorization rules in priority order</caption>
             <thead><tr><th scope="col">{m.categories.priority}</th><th scope="col">Condition</th><th scope="col">{m.tx.category}</th><th scope="col" className="num">Matches</th><th scope="col">{m.categories.enabled}</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{rules.data.map((r) => (
               <tr key={r.id} className={r.enabled ? '' : 'muted-row'}>
-                <td>{r.priority}</td>
-                <td>{r.field === 'merchant' ? 'Merchant' : 'Description'} {r.match_type.replace('_', ' ')} “{r.pattern}”{r.direction !== 'any' && <small className="muted"> ({r.direction === 'out' ? 'money out' : 'money in'})</small>}</td>
-                <td>{r.category_name}</td>
-                <td className="num"><Link to={`/transactions?q=${encodeURIComponent(r.pattern)}`}>{r.match_count}</Link></td>
-                <td><label className="switch"><input type="checkbox" checked={!!r.enabled} disabled={act.busy} onChange={(e) => act.run(async () => { try { await api(`/rules/${r.id}`, { method: 'PATCH', body: { enabled: e.target.checked } }); await done(e.target.checked ? 'Rule enabled' : 'Rule disabled'); } catch (er) { fail(er); } })} /><span className="sr-only">{m.categories.enabled}</span></label></td>
+                <td data-label={m.categories.priority}>{r.priority}</td>
+                <td data-label="Condition">{r.field === 'merchant' ? 'Merchant' : 'Description'} {r.match_type.replace('_', ' ')} “{r.pattern}”{r.direction !== 'any' && <small className="muted"> ({r.direction === 'out' ? 'money out' : 'money in'})</small>}</td>
+                <td data-label={m.tx.category}>{r.category_name}</td>
+                <td className="num" data-label="Matches"><Link to={`/transactions?q=${encodeURIComponent(r.pattern)}`}>{r.match_count}</Link></td>
+                <td data-label={m.categories.enabled}><label className="switch"><input type="checkbox" checked={!!r.enabled} disabled={act.busy} onChange={(e) => act.run(async () => { try { await api(`/rules/${r.id}`, { method: 'PATCH', body: { enabled: e.target.checked } }); await done(e.target.checked ? 'Rule enabled' : 'Rule disabled'); } catch (er) { fail(er); } })} /><span className="sr-only">{m.categories.enabled}</span></label></td>
                 <td className="actions"><button className="btn btn-small" onClick={() => setEditRule(r)}>{m.common.edit}</button><button className="btn btn-small btn-danger" onClick={() => setDelRule(r)}>{m.common.delete}</button></td>
               </tr>
             ))}</tbody>
