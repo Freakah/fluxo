@@ -27,7 +27,10 @@ Not verified by the authors: pricing of restricted mode (the docs do not state a
    ```bash
    openssl req -new -x509 -newkey rsa:2048 -nodes -days 730 -keyout enablebanking-private.pem -out enablebanking-cert.pem -subj "/CN=fluxo"
    ```
-3. Register a new application, choose **production** (restricted) or **sandbox** for testing, upload `enablebanking-cert.pem`, and set the redirect URL to `<PUBLIC_URL>/api/connections/callback` (e.g. `http://localhost:3000/api/connections/callback` for a local install, if the Control Panel accepts it; otherwise use your HTTPS hostname).
+3. Register a new application, choose **production** (restricted) or **sandbox** for testing, choose “Generate outside the browser and import public certificate”, and paste the **contents** of `enablebanking-cert.pem`. Privacy and Terms URLs are required for production: you can use `docs/PRIVACY.md` and `docs/TERMS.md` from your repository.
+   **Redirect URL:** Enable Banking only accepts `https://` URLs, so `http://localhost` is rejected. Options:
+   - Local install: register the relay page `https://freakah.github.io/fluxo/callback.html` (from `docs/callback.html`, served by GitHub Pages) and set `BANK_REDIRECT_URL` to the same value. It forwards only `state`, `code` and `error` to `http://localhost:3000/api/connections/callback`; the code is useless without your private key. If you use another port, fork the repo, edit `TARGET` in `docs/callback.html`, enable Pages, and use your own URL.
+   - Hosted install with HTTPS: register `<PUBLIC_URL>/api/connections/callback` and leave `BANK_REDIRECT_URL` empty.
 4. For production restricted mode: click **Activate by linking accounts** and authorize your Millennium bcp account. This only activates the app; you still connect inside Fluxo.
 5. In `.env`:
    ```

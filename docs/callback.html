@@ -1,0 +1,23 @@
+<!doctype html>
+<!--
+  Bank-authorization relay for self-hosted Fluxo (published with GitHub Pages).
+  Providers only accept https:// redirect URLs, while Fluxo usually runs on http://localhost.
+  This page forwards ONLY the provider's state/code/error parameters to a FIXED local address.
+  The one-time code is useless without the operator's private key, which never leaves their computer.
+  Self-hosting on another port or host? Fork, change TARGET, and set BANK_REDIRECT_URL to your copy.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1uOLDx/AQ6o/V++zXFGMuP5OT31bws3To3bq4Mvx4sc='; style-src 'unsafe-inline'">
+  <title>Returning to Fluxo…</title>
+  <style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5}</style>
+</head>
+<body>
+  <h1>Returning to Fluxo…</h1>
+  <p>Your bank authorization is complete. If nothing happens, make sure Fluxo is running on this computer, then <a id="go" href="http://localhost:3000/accounts">continue to Fluxo</a>.</p>
+  <script>(function(){var T='http://localhost:3000/api/connections/callback',q=new URLSearchParams(location.search),o=new URLSearchParams();['state','code','error','error_description'].forEach(function(k){var v=q.get(k);if(v!==null)o.set(k,v.slice(0,2000));});var u=T+'?'+o.toString();document.getElementById('go').href=u;location.replace(u);})();</script>
+</body>
+</html>

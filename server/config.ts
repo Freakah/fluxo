@@ -21,6 +21,8 @@ const schema = z.object({
   ENABLE_BANKING_KEY_PATH: z.string().optional(),
   ENABLE_BANKING_API_URL: z.url().default('https://api.enablebanking.com'),
   ENABLE_BANKING_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
+  // https page registered with the provider that forwards to <PUBLIC_URL>/api/connections/callback (providers reject http://localhost).
+  BANK_REDIRECT_URL: z.url().refine((u) => u.startsWith('https://'), 'must use https://').optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
 

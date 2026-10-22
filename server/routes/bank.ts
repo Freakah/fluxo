@@ -77,7 +77,7 @@ export function bankRoutes(deps: Deps) {
       hashToken(state), uid(c), b.connectionId ?? null, p.id, inst.name, inst.country, nowIso(), new Date(Date.now() + STATE_TTL_MS).toISOString());
     const days = Math.min(inst.maxConsentDays ?? 90, 180);
     const validUntil = new Date(Date.now() + days * 86400000 - 3600_000);
-    const { url } = await p.startAuthorization({ institution: inst, state, redirectUrl: `${config.PUBLIC_URL}/api/connections/callback`, validUntil }).catch((e) => {
+    const { url } = await p.startAuthorization({ institution: inst, state, redirectUrl: config.BANK_REDIRECT_URL ?? `${config.PUBLIC_URL}/api/connections/callback`, validUntil }).catch((e) => {
       throw new HttpError(502, e instanceof ProviderError ? `The provider refused to start authorization: ${e.message}` : 'Could not start authorization.');
     });
     return c.json({ url });
