@@ -21,6 +21,8 @@ export function normalizeMerchant(description: string, counterparty?: string | n
   const base = (counterparty && counterparty.trim()) || description;
   const mb = /^mb ?way\s+(p\/|para|de)\s*(.+)$/i.exec(base.trim());
   if (mb) return `MB WAY ${/^de$/i.test(mb[1]) ? 'from' : 'to'} ${mb[2].trim()}`;
+  const ent = /^pag(?:amento)?\.? serv(?:i[cç]os)?\.?\s+ent(?:idade)?\.?\s*(\d{5})/i.exec(base.trim());
+  if (ent) return `Payment to entity ${ent[1]}`; // Multibanco service payment: the entity number identifies the payee
   let s = base.replace(/\s+/g, ' ').trim();
   for (let i = 0; i < 3; i++) for (const p of PREFIXES) s = s.replace(p, '');
   s = s.replace(/\*+/g, ' ').replace(/\b\d{5,}\b/g, '').replace(SUFFIX_NOISE, '').replace(/[ ,.-]+$/g, '').replace(/\s+/g, ' ').trim();

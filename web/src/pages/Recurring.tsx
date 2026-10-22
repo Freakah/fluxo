@@ -44,19 +44,19 @@ export function RecurringPage() {
       <Card>
         {!rows.length ? <Empty title={tab === 'suggested' && !r.data.length ? m.recurring.empty : 'Nothing here.'} /> : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table stack">
               <caption className="sr-only">{tabLabel[tab]} recurring payments</caption>
               <thead><tr><th scope="col">{m.tx.merchant}</th><th scope="col">{m.recurring.kind}</th><th scope="col">{m.recurring.frequency}</th><th scope="col" className="num">{m.recurring.typical}</th><th scope="col" className="num">{m.recurring.monthly}</th><th scope="col">{m.recurring.next}</th><th scope="col">{m.recurring.confidence}</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {rows.map((x) => (
                   <tr key={x.id}>
                     <th scope="row"><Link to={`/transactions?q=${encodeURIComponent(x.merchant)}`}>{x.merchant}</Link>{x.possibly_ended && <><br /><Badge tone="warn" icon="!">{m.recurring.possiblyEnded}</Badge></>}</th>
-                    <td>{m.kinds[x.kind]}</td>
-                    <td>{m.freqs[x.effective_frequency]}</td>
-                    <td className="num">~<Money minor={x.effective_amount_minor} currency={x.currency} />{x.max_amount_minor !== x.min_amount_minor && <><br /><small className="muted">{m.recurring.variable}: {fmt.money(x.min_amount_minor, x.currency)}–{fmt.money(x.max_amount_minor, x.currency)}</small></>}</td>
-                    <td className="num">~<Money minor={x.monthly_equivalent_minor} currency={x.currency} /></td>
-                    <td>{x.next_date ? `~${fmt.date(x.next_date)}` : '—'}</td>
-                    <td><Badge tone={x.confidence === 'high' ? 'ok' : x.confidence === 'medium' ? 'info' : 'warn'}>{x.confidence}</Badge><br /><small className="muted">{x.occurrences}×, last {fmt.shortDate(x.last_date)}</small></td>
+                    <td data-label={m.recurring.kind}>{m.kinds[x.kind]}</td>
+                    <td data-label={m.recurring.frequency}>{m.freqs[x.effective_frequency]}</td>
+                    <td className="num" data-label={m.recurring.typical}>~<Money minor={x.effective_amount_minor} currency={x.currency} />{x.max_amount_minor !== x.min_amount_minor && <><br /><small className="muted">{m.recurring.variable}: {fmt.money(x.min_amount_minor, x.currency)}–{fmt.money(x.max_amount_minor, x.currency)}</small></>}</td>
+                    <td className="num" data-label={m.recurring.monthly}>~<Money minor={x.monthly_equivalent_minor} currency={x.currency} /></td>
+                    <td data-label={m.recurring.next}>{x.next_date ? `~${fmt.date(x.next_date)}` : '—'}</td>
+                    <td data-label={m.recurring.confidence}><Badge tone={x.confidence === 'high' ? 'ok' : x.confidence === 'medium' ? 'info' : 'warn'}>{x.confidence}</Badge><br /><small className="muted">{x.occurrences}×, last {fmt.shortDate(x.last_date)}</small></td>
                     <td className="actions">
                       {x.status !== 'confirmed' && <button className="btn btn-small btn-primary" disabled={act.busy} onClick={() => setStatus(x, 'confirmed')}>{x.status === 'suggested' ? m.recurring.confirm : m.recurring.reactivate}</button>}
                       {x.status === 'confirmed' && <button className="btn btn-small" disabled={act.busy} onClick={() => setStatus(x, 'inactive')}>{m.recurring.inactive}</button>}

@@ -73,6 +73,7 @@ function Shell() {
           <ul>
             {NAV.map(([to, label, icon]) => <li key={to}><NavLink to={to} end={to === '/'}><span aria-hidden="true" className="nav-icon">{icon}</span>{label}</NavLink></li>)}
             <li><NavLink to="/help"><span aria-hidden="true" className="nav-icon">?</span>{m.nav.help}</NavLink></li>
+            <li className="nav-signout"><button className="btn" onClick={signOut}>{m.nav.signOut}</button></li>
           </ul>
           <p className="nav-foot">{user.isDemo ? 'Demo' : user.email}<br /><small>v{session.version}</small></p>
         </nav>
