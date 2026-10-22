@@ -1,109 +1,166 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Lightbulb, Check } from 'lucide-react';
 import { api, useAction, useApi } from '../api.ts';
 import { m } from '../i18n.ts';
-import { useSession, useToast } from '../state.tsx';
-import { Card, ErrorBox, Loading, Money, Progress, stateBadge, Help, Field } from '../components/ui.tsx';
-import { addMonths, monthBounds } from '../../../shared/dates.ts';
-import { minorToDecimal } from '../../../shared/money.ts';
-import type { BudgetLine, Category } from '../types.ts';
+import { useCategories, useSession, useToast } from '../state.tsx';
+import { Card, Empty, ErrorBox, Loading, Money, Progress, Ring, stateBadge, Modal, PageHeader, Info } from '../components/ui.tsx';
+import { CatIcon } from '../components/icons.tsx';
+import { CategoryPicker } from './Transactions.tsx';
+import { addMonths, monthBounds, todayIn, monthOf } from '../../../shared/dates.ts';
+import { currencyExponent, minorToDecimal, parseAmountToMinor } from '../../../shared/money.ts';
+import type { BudgetLine } from '../types.ts';
 
 type B = { month: string; currency: string; thresholds: number[]; isCurrentMonth: boolean; total: BudgetLine | null; categories: BudgetLine[] };
-
-function Line({ l, currency, title, editable, onSave, onRemove, link }: { l: BudgetLine; currency: string; title: string; editable: boolean; onSave: (v: string) => Promise<void>; onRemove?: () => Promise<void>; link: string }) {
-  const [editing, setEditing] = useState(false);
-  const [v, setV] = useState(minorToDecimal(l.amount, currency));
-  const { busy, run } = useAction();
-  const diff = l.spent - l.previousSpent;
-  return (
-    <div className="budget-line">
-      <div className="budget-top">
-        <h3><Link to={link}>{title}</Link></h3>
-        {stateBadge(l.state)}
-      </div>
-      <Progress pct={l.pct} state={l.state} label={`${title}: ${l.pct}% used`} />
-      <p className="budget-nums">
-        <span><Money minor={l.spent} currency={currency} /> {m.budgets.spent} {m.budgets.of} <Money minor={l.amount} currency={currency} /> ({l.pct}%)</span>
-        <span className={l.remaining < 0 ? 'neg' : ''}><Money minor={Math.abs(l.remaining)} currency={currency} /> {l.remaining < 0 ? m.budgets.over : m.budgets.left}</span>
-      </p>
-      <p className="help">
-        {l.pending > 0 && <>+ <Money minor={l.pending} currency={currency} /> pending (not counted yet) · </>}
-        {m.budgets.previous}: <Money minor={l.previousSpent} currency={currency} /> ({diff >= 0 ? '+' : '−'}<Money minor={Math.abs(diff)} currency={currency} />)
-      </p>
-      {editable && (editing ? (
-        <form className="row" onSubmit={(e) => { e.preventDefault(); void run(async () => { await onSave(v.replace(',', '.')); setEditing(false); }); }}>
-          <label className="sr-only" htmlFor={`b-${l.categoryId ?? 't'}`}>{m.budgets.amount}</label>
-          <input id={`b-${l.categoryId ?? 't'}`} inputMode="decimal" pattern="\d+([.,]\d{1,2})?" required value={v} onChange={(e) => setV(e.target.value)} />
-          <button className="btn btn-primary btn-small" disabled={busy}>{m.common.save}</button>
-          <button type="button" className="btn btn-small" onClick={() => setEditing(false)}>{m.common.cancel}</button>
-          {onRemove && <button type="button" className="btn btn-small btn-danger" disabled={busy} onClick={() => run(onRemove)}>{m.budgets.remove}</button>}
-        </form>
-      ) : <button className="link" onClick={() => setEditing(true)}>{m.common.edit}</button>)}
-    </div>
-  );
-}
+type Wizard = { categoryId: number | null; amount: number | null; edit: boolean; total?: boolean };
 
 export function Budgets() {
   const { fmt, settings } = useSession();
+  const { byId, list: cats } = useCategories();
   const toast = useToast();
   const [month, setMonth] = useState<string | null>(null);
+  const [wizard, setWizard] = useState<Wizard | null>(null);
   const b = useApi<B>(`/budgets${month ? `?month=${month}` : ''}`);
-  const cats = useApi<Category[]>('/categories');
-  const [newCat, setNewCat] = useState('');
-  const [newAmt, setNewAmt] = useState('');
-  const add = useAction();
-  if (b.error) return <ErrorBox error={b.error} onRetry={() => b.reload()} />;
-  if (!b.data) return <Loading />;
+  if (b.error) return <div className="page"><ErrorBox error={b.error} onRetry={() => b.reload()} /></div>;
+  if (!b.data) return <div className="page"><Loading rows={5} /></div>;
   const x = b.data;
-  const save = (categoryId: number | null) => async (amount: string | null) => {
-    try { await api('/budgets', { method: 'PUT', body: { categoryId, amount } }); toast(m.common.saved); await b.reload(true); } catch (e) { toast((e as Error).message, { kind: 'error' }); throw e; }
+  const save = async (categoryId: number | null, amount: string | null) => {
+    try { await api('/budgets', { method: 'PUT', body: { categoryId, amount } }); toast(amount === null ? 'Budget removed' : m.common.saved); await b.reload(true); } catch (e) { toast((e as Error).message, { kind: 'error' }); throw e; }
   };
   const used = new Set(x.categories.map((c) => c.categoryId));
-  const available = (cats.data ?? []).filter((c) => !c.archived_at && !used.has(c.id) && c.key !== 'income');
+  const available = cats.filter((c) => !c.archived_at && !used.has(c.id) && c.key !== 'income');
   const txLink = (catId: number | null) => `/transactions?from=${x.month}-01&to=${monthBounds(x.month).to}&status=posted${catId ? `&category=${catId}` : ''}`;
+  const today = todayIn(settings.timezone);
+  const daysLeft = x.isCurrentMonth ? monthBounds(x.month).days - Number(today.slice(8)) + 1 : 0;
+  const t = x.total;
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{m.budgets.title}</h1>
-        <div className="row" role="group" aria-label="Month">
-          <button className="btn btn-small" onClick={() => setMonth(addMonths(x.month, -1))} aria-label="Previous month">‹</button>
-          <strong aria-live="polite">{fmt.month(x.month)}</strong>
-          <button className="btn btn-small" onClick={() => setMonth(addMonths(x.month, 1))} disabled={x.isCurrentMonth} aria-label="Next month">›</button>
-        </div>
-      </div>
-      {!x.isCurrentMonth && <p className="help">{m.budgets.notCurrent}</p>}
+      <PageHeader title={m.budgets.title} subtitle="Decide how much to spend, and see how you are doing." info={<>{m.budgets.rulesText} Alerts at {x.thresholds.join('% and ')}% (change in Settings).</>}
+        actions={<div className="segmented" role="group" aria-label="Month">
+          <button onClick={() => setMonth(addMonths(x.month, -1))} aria-label="Previous month"><ChevronLeft size={18} aria-hidden="true" /></button>
+          <button className="on" aria-live="polite" tabIndex={-1}>{fmt.month(x.month)}</button>
+          <button onClick={() => setMonth(addMonths(x.month, 1))} disabled={x.isCurrentMonth} aria-label="Next month"><ChevronRight size={18} aria-hidden="true" /></button>
+        </div>} />
+      {!x.isCurrentMonth && <div className="alert alert-info" role="note">{m.budgets.notCurrent}</div>}
+
       <Card title={m.budgets.total}>
-        {x.total ? <Line l={x.total} currency={x.currency} title={m.budgets.total} editable={x.isCurrentMonth} onSave={save(null)} onRemove={() => save(null)(null)} link={txLink(null)} /> : (
-          x.isCurrentMonth ? <SetTotal onSave={save(null)} currency={settings.currency} /> : <p className="muted">No monthly budget was set for this month.</p>
-        )}
+        {t ? (
+          <div className="budget-hero">
+            <Ring pct={t.pct} state={t.state} size={150} label={`${t.pct}% of the monthly budget used`}>
+              <span><strong>{t.pct}%</strong><br /><small className="muted">used</small></span>
+            </Ring>
+            <div className="budget-hero-text stack" style={{ gap: '.4rem' }}>
+              <div className="row">{stateBadge(t.state)}</div>
+              <div className={`big ${t.remaining < 0 ? 'neg' : ''}`}><Money minor={Math.abs(t.remaining)} currency={x.currency} /> {t.remaining < 0 ? m.budgets.over : m.budgets.left}</div>
+              <div className="muted"><Money minor={t.spent} currency={x.currency} /> {m.budgets.spent} {m.budgets.of} <Money minor={t.amount} currency={x.currency} /></div>
+              {daysLeft > 0 && t.remaining > 0 && <div className="suggest"><Lightbulb size={18} aria-hidden="true" />About <strong><Money minor={Math.floor(t.remaining / daysLeft)} currency={x.currency} /></strong> a day for the next {daysLeft} days.</div>}
+              {t.pending > 0 && <small className="muted">+ <Money minor={t.pending} currency={x.currency} /> processing (not counted yet)</small>}
+              <div className="row">
+                <Link to={txLink(null)} className="btn btn-small">See payments</Link>
+                {x.isCurrentMonth && <button className="btn btn-small" onClick={() => setWizard({ categoryId: null, amount: t.amount, edit: true, total: true })}><Pencil size={15} aria-hidden="true" />{m.common.edit}</button>}
+              </div>
+            </div>
+          </div>
+        ) : x.isCurrentMonth
+          ? <Empty art="target" title="Create a monthly budget" action={<button className="btn btn-primary" onClick={() => setWizard({ categoryId: null, amount: null, edit: false, total: true })}><Plus size={18} aria-hidden="true" />Create budget</button>}>Choose one amount for all your spending this month. Fluxo suggests one from your last 3 months.</Empty>
+          : <p className="muted">No monthly budget was set for this month.</p>}
       </Card>
-      <Card title={m.budgets.category}>
-        <Help>{m.budgets.categoryHelp}</Help>
-        {x.categories.map((l) => <Line key={l.categoryId} l={l} currency={x.currency} title={l.name ?? 'Category'} editable={x.isCurrentMonth} onSave={save(l.categoryId)} onRemove={() => save(l.categoryId)(null)} link={txLink(l.categoryId)} />)}
-        {x.isCurrentMonth && (
-          <form className="row add-budget" onSubmit={(e) => { e.preventDefault(); void add.run(async () => { await save(Number(newCat))(newAmt.replace(',', '.')); setNewCat(''); setNewAmt(''); }); }}>
-            <Field label={m.tx.category}>{(id) => <select id={id} required value={newCat} onChange={(e) => setNewCat(e.target.value)}><option value="">Choose…</option>{available.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
-            <Field label={`${m.budgets.amount} (${x.currency})`}>{(id) => <input id={id} required inputMode="decimal" pattern="\d+([.,]\d{1,2})?" value={newAmt} onChange={(e) => setNewAmt(e.target.value)} />}</Field>
-            <button className="btn btn-primary" disabled={add.busy}>{m.budgets.add}</button>
-          </form>
-        )}
-      </Card>
-      <Card title={m.budgets.rules}>
-        <p>{m.budgets.rulesText}</p>
-        <p className="help">Alerts at {x.thresholds.join('% and ')}% (change in <Link to="/settings">Settings</Link>).</p>
-      </Card>
+
+      <section aria-labelledby="catb">
+        <div className="card-head"><h2 id="catb">{m.budgets.category}<Info>{m.budgets.categoryHelp}</Info></h2></div>
+        <div className="budget-grid">
+          {x.categories.map((l) => {
+            const c = l.categoryId ? byId.get(l.categoryId) : undefined;
+            const diff = l.spent - l.previousSpent;
+            return (
+              <article key={l.categoryId} className="budget-card">
+                <div className="budget-card-top">
+                  <CatIcon cat={c ?? { color: l.color }} size={40} />
+                  <h3><Link to={txLink(l.categoryId)}>{l.name ?? 'Category'}</Link></h3>
+                  {stateBadge(l.state)}
+                </div>
+                <Progress pct={l.pct} state={l.state} label={`${l.name}: ${l.pct}% used`} />
+                <div className="budget-nums">
+                  <span><strong><Money minor={l.spent} currency={x.currency} /></strong> {m.budgets.of} <Money minor={l.amount} currency={x.currency} /></span>
+                  <span className={l.remaining < 0 ? 'neg' : 'muted'}><Money minor={Math.abs(l.remaining)} currency={x.currency} /> {l.remaining < 0 ? m.budgets.over : m.budgets.left}</span>
+                </div>
+                <small className="muted">{m.budgets.previous}: <Money minor={l.previousSpent} currency={x.currency} /> ({diff >= 0 ? '+' : '−'}<Money minor={Math.abs(diff)} currency={x.currency} />){l.pending > 0 && <> · + <Money minor={l.pending} currency={x.currency} /> processing</>}</small>
+                {x.isCurrentMonth && (
+                  <div className="row">
+                    <button className="btn btn-small" onClick={() => setWizard({ categoryId: l.categoryId, amount: l.amount, edit: true })} aria-label={`Edit ${l.name} budget`}><Pencil size={15} aria-hidden="true" />{m.common.edit}</button>
+                    <button className="btn btn-small btn-ghost" onClick={() => save(l.categoryId, null)} aria-label={`Remove ${l.name} budget`}><Trash2 size={15} aria-hidden="true" />Remove</button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+          {x.isCurrentMonth && available.length > 0 && (
+            <button className="budget-card add-card" onClick={() => setWizard({ categoryId: available[0].id, amount: null, edit: false })}><Plus size={28} aria-hidden="true" />{m.budgets.add}</button>
+          )}
+        </div>
+        {!x.categories.length && !x.isCurrentMonth && <p className="muted">No category budgets this month.</p>}
+      </section>
+
+      {wizard && <BudgetWizard w={wizard} currency={x.currency} options={wizard.edit || wizard.total ? [] : available} onClose={() => setWizard(null)}
+        onSave={async (cat, amt) => { await save(cat, amt); setWizard(null); }} />}
     </div>
   );
 }
 
-function SetTotal({ onSave, currency }: { onSave: (v: string) => Promise<void>; currency: string }) {
-  const [v, setV] = useState('');
+/** Three short steps: choose what to budget, pick an amount (with a suggestion), confirm. */
+function BudgetWizard({ w, currency, options, onClose, onSave }: { w: Wizard; currency: string; options: ReturnType<typeof useCategories>['list']; onClose: () => void; onSave: (cat: number | null, amount: string) => Promise<void> }) {
+  const { settings, fmt } = useSession();
+  const { byId } = useCategories();
+  const isTotal = !!w.total;
+  const [step, setStep] = useState(w.edit || isTotal ? 1 : 0);
+  const [cat, setCat] = useState<number | null>(w.categoryId);
+  const [amt, setAmt] = useState(w.amount !== null ? minorToDecimal(w.amount, currency) : '');
   const { busy, run } = useAction();
+  const cur = monthOf(todayIn(settings.timezone));
+  const hist = useApi<{ totals: { currency: string; spending: number }[]; byCategory: { categoryId: number | null; currency: string; spending: number }[] }>(
+    `/reports?from=${addMonths(cur, -3)}-01&to=${monthBounds(addMonths(cur, -1)).to}`);
+  const spent3 = hist.data ? (cat === null ? hist.data.totals.find((t) => t.currency === currency)?.spending : hist.data.byCategory.find((c) => c.categoryId === cat && c.currency === currency)?.spending) ?? 0 : null;
+  const step10 = 10 * 10 ** currencyExponent(currency); // suggestions round up to 10 whole currency units
+  const suggestion = spent3 !== null && spent3 > 0 ? Math.ceil(spent3 / 3 / step10) * step10 : null;
+  const amountMinor = (() => { try { return parseAmountToMinor(amt.replace(',', '.'), currency); } catch { return 0; } })();
+  const sliderMax = Math.max(step10 * 10, (suggestion ?? 0) * 2, amountMinor);
+  const valid = /^\d+([.,]\d{1,2})?$/.test(amt) && amountMinor > 0;
+  const name = cat === null ? 'All spending' : byId.get(cat)?.name ?? 'Category';
+  const steps = isTotal || w.edit ? ['Amount', 'Confirm'] : ['Category', 'Amount', 'Confirm'];
+  const idx = isTotal || w.edit ? step - 1 : step;
+
   return (
-    <form className="row" onSubmit={(e) => { e.preventDefault(); void run(() => onSave(v.replace(',', '.'))); }}>
-      <Field label={`${m.budgets.amount} (${currency})`}>{(id) => <input id={id} required inputMode="decimal" pattern="\d+([.,]\d{1,2})?" value={v} onChange={(e) => setV(e.target.value)} />}</Field>
-      <button className="btn btn-primary" disabled={busy}>{m.dashboard.setBudget}</button>
-    </form>
+    <Modal open title={w.edit ? `Edit budget: ${name}` : cat === null ? 'Create a monthly budget' : m.budgets.add} onClose={onClose} footer={<>
+      {step > (isTotal || w.edit ? 1 : 0) && <button className="btn" onClick={() => setStep(step - 1)}>{m.common.back}</button>}
+      <span className="spacer" />
+      {step < 2 ? <button className="btn btn-primary" disabled={step === 1 && !valid} onClick={() => setStep(step + 1)}>Continue</button>
+        : <button className="btn btn-primary" disabled={busy || !valid} onClick={() => run(() => onSave(cat, amt.replace(',', '.')))}><Check size={18} aria-hidden="true" />Save budget</button>}
+    </>}>
+      <div className="steps-dots" aria-label={`Step ${idx + 1} of ${steps.length}: ${steps[idx]}`} role="img">{steps.map((s, k) => <span key={s} className={k === idx ? 'on' : ''} />)}</div>
+      {step === 0 && <>
+        <p className="lede">Which category do you want to keep an eye on?</p>
+        <CategoryPicker label={m.tx.category} categories={options} value={cat} onChange={(v) => v !== null && setCat(v)} />
+      </>}
+      {step === 1 && <>
+        <div className="row"><CatIcon cat={cat === null ? { color: '#2563eb', icon: 'wallet' } : byId.get(cat)} size={44} /><strong>{name}</strong></div>
+        <div className="field">
+          <label htmlFor="budget-amt">{m.budgets.amount} ({currency})</label>
+          <div className="amount-input"><span aria-hidden="true">{fmt.currencySymbol(currency)}</span><input id="budget-amt" autoFocus data-autofocus inputMode="decimal" placeholder="0" value={amt} onChange={(e) => setAmt(e.target.value)} /></div>
+        </div>
+        <label className="sr-only" htmlFor="budget-slider">Adjust amount</label>
+        <input id="budget-slider" type="range" min={0} max={sliderMax} step={step10 / 2} value={amountMinor} onChange={(e) => setAmt(minorToDecimal(Number(e.target.value), currency))} />
+        {suggestion !== null
+          ? <button type="button" className="suggest" style={{ border: 0, cursor: 'pointer', textAlign: 'left' }} onClick={() => setAmt(minorToDecimal(suggestion, currency))}><Lightbulb size={18} aria-hidden="true" /><span>You spent about <strong><Money minor={Math.round(spent3! / 3)} currency={currency} /></strong> a month lately. Use <strong><Money minor={suggestion} currency={currency} /></strong>?</span></button>
+          : hist.data && <small className="muted">Not enough history yet for a suggestion.</small>}
+      </>}
+      {step === 2 && (
+        <div className="welcome">
+          <Ring pct={0} state="ok" size={120} label="New budget"><CatIcon cat={cat === null ? { color: '#2563eb', icon: 'wallet' } : byId.get(cat)} size={48} /></Ring>
+          <h3>{name}: <Money minor={amountMinor} currency={currency} /> a month</h3>
+          <p>Starts with this month and continues every month until you change it. Unused money does not roll over.</p>
+        </div>
+      )}
+    </Modal>
   );
 }

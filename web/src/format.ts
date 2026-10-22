@@ -10,6 +10,7 @@ export function makeFormat(s: Settings) {
   const asUtc = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`);
   return {
     hidden: s.hideAmounts,
+    currencySymbol: (currency = s.currency) => new Intl.NumberFormat(s.locale, { style: 'currency', currency }).formatToParts(0).find((p) => p.type === 'currency')?.value ?? currency,
     money: (minor: number | null | undefined, currency = s.currency, sign: 'auto' | 'always' | 'exceptZero' = 'auto') =>
       minor === null || minor === undefined ? '—' : s.hideAmounts ? '•••••' : formatMoney(minor, currency, s.locale, { signDisplay: sign }),
     date: (d: string | null | undefined) => (d ? dateFmt.format(asUtc(d)) : '—'),

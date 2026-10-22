@@ -8,6 +8,8 @@
 | jose | RS256 JWT signing for Enable Banking |
 | otpauth | TOTP two-step verification |
 | react, react-dom, react-router | UI |
+| lucide-react (ISC) | Icons |
+| @fontsource-variable/inter (OFL-1.1) | Inter font, bundled locally (no requests to font services) |
 
 Built-in Node modules cover SQLite (`node:sqlite`), password hashing (`crypto.scrypt`) and encryption (`crypto` AES-256-GCM).
 

@@ -11,11 +11,11 @@ defaults (all configurable).
 
 ![Dashboard (demo data)](docs/screenshots/dashboard.png)
 
-| Transactions | Budgets | Recurring |
+| Activity | Budgets | Bills |
 |---|---|---|
-| ![Transactions](docs/screenshots/transactions.png) | ![Budgets](docs/screenshots/budgets.png) | ![Recurring](docs/screenshots/recurring.png) |
-| **Reports** | **Accounts** | **Mobile / dark** |
-| ![Reports](docs/screenshots/reports.png) | ![Accounts](docs/screenshots/accounts.png) | ![Mobile](docs/screenshots/mobile-transactions.png) |
+| ![Transactions](docs/screenshots/transactions.png) | ![Budgets](docs/screenshots/budgets.png) | ![Bills](docs/screenshots/recurring.png) |
+| **Insights** | **Banks** | **Mobile** |
+| ![Insights](docs/screenshots/reports.png) | ![Banks](docs/screenshots/accounts.png) | ![Mobile](docs/screenshots/mobile-transactions.png) |
 
 All screenshots use synthetic demo data.
 
@@ -23,12 +23,13 @@ All screenshots use synthetic demo data.
 
 - **Automatic sync** (server-side, background) via [Enable Banking](https://enablebanking.com) — read-only account information; no payments, no scraping, no bank passwords in Fluxo.
 - **Reliable imports**: full initial pagination, overlapping incremental windows, idempotent writes, pending→posted reconciliation, identical purchases kept separate, never deletes posted history. See [docs/SYNC.md](docs/SYNC.md).
-- **Dashboard**: posted spending, income, net cash flow, budget remaining, pending activity and bank-reported balances — each clearly labelled and kept separate.
-- **Transactions**: search, filters (account, dates, category, type, status, amount), sorting, detail view showing bank facts vs. your own labels, notes, bulk edits, exclusion from reports, undo.
+- **Friendly, guided interface**: a first-run welcome, an optional guided tour, plain-language labels with ⓘ explanations, category icons, illustrations, Ctrl+K quick search, and a phone layout with a bottom tab bar.
+- **Home**: what you spent this month (compared with last month), budget left per day, money in, bills coming up, and an interactive “where it went” chart you can click into.
+- **Activity**: grouped by day; search, quick filter chips (account, dates, category, type, status, amount), sorting, detail view showing bank facts vs. your own labels, notes, bulk edits, exclusion from reports, undo.
 - **Categorization without AI services**: your corrections → your rules → known merchants / card codes → description keywords → Uncategorized. Every category shows *why* and *how confident*. Rule preview before applying to history.
-- **Budgets**: monthly total + category limits, 80 %/100 % alerts (configurable), previous-month comparison.
-- **Recurring payments**: weekly/monthly/quarterly/yearly detection, subscriptions vs. bills, variable bills, monthly equivalents — always labelled as estimates.
-- **Reports & exports**: category, monthly trend, income vs. spending, budget vs. actual, merchants, commitments; filtered CSV (formula-injection safe) and full JSON export.
+- **Budgets**: monthly total + category limits with progress rings, a step-by-step setup that suggests amounts from your last 3 months, 80 %/100 % alerts (configurable), previous-month comparison.
+- **Bills and subscriptions**: a calendar of expected payments; weekly/monthly/quarterly/yearly detection, subscriptions vs. bills, variable bills, monthly equivalents — always labelled as estimates.
+- **Insights & exports**: category, monthly trend, income vs. spending, budget vs. actual, merchants, commitments; filtered CSV (formula-injection safe) and full JSON export.
 - **Privacy & security**: hashed server-side sessions, optional TOTP 2-step verification, rate limiting, CSRF defences, CSP, encrypted provider sessions, hide-amounts toggle, data export and deletion. No analytics, no trackers.
 - **Demo mode** with realistic Portuguese synthetic data — try everything without a bank.
 - Accessible (keyboard, screen readers, contrast, reduced motion, chart tables), responsive, light/dark.

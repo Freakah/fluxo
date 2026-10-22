@@ -171,6 +171,7 @@ export function insightRoutes(deps: Deps) {
     hideAmounts: z.boolean().optional(),
     budgetThresholds: z.array(z.number().int().min(1).max(200)).min(1).max(4).optional(),
     notify: z.object({ budget: z.boolean(), sync: z.boolean(), consent: z.boolean(), recurring: z.boolean() }).partial().optional(),
+    onboarded: z.boolean().optional(),
   }).strict();
   app.put('/me/settings', async (c) => {
     const b = await body(c, settingsSchema);

@@ -4,6 +4,7 @@ import { test, expect, type Page } from '@playwright/test';
 async function demo(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Try the demo' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Skip' }).click();
   await expect(page.getByRole('heading', { name: /Dashboard/ })).toBeVisible();
 }
 

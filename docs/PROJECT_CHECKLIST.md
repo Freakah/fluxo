@@ -40,9 +40,12 @@ original task; this file tracks status.
 - [x] Demo mode: deterministic Portuguese data incl. failing sync + expired consent; per-visitor workspaces; reset
 - [x] Docs, LICENSE (holder placeholder), SECURITY, CONTRIBUTING, CHANGELOG, CI, Dependabot, templates, screenshots
 
+## Redesign (2026-10-22)
+- [x] Design system (Inter, Lucide icons, tokens, light/dark), grouped navigation, mobile bottom bar, welcome + tour, Ctrl+K palette, illustrations, redesigned pages, lazy-loaded secondary pages (main bundle ~320 kB). 18 e2e tests (desktop + mobile, axe) pass.
+
 ## Remaining / future work
 - Portuguese translation file (`web/src/i18n.ts` structure ready)
-- Email/push notifications (optional), QR code for TOTP setup, code-splitting the UI bundle (~420 kB)
+- Email/push notifications (optional), QR code for TOTP setup
 - Savings goals, household sharing, receipt OCR, forecasting, AI classification (out of scope)
 
 ## Verification results (2026-10-22)
