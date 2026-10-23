@@ -41,6 +41,20 @@ All screenshots use synthetic demo data.
 - **Demo mode** with realistic Portuguese synthetic data — try everything without a bank.
 - Accessible (keyboard, screen readers, contrast, reduced motion, chart tables), responsive, light/dark.
 
+## Try it on Windows (no setup knowledge needed)
+
+1. **[Download Fluxo](https://github.com/Freakah/fluxo/archive/refs/heads/main.zip)** and open the downloaded file.
+2. Click **Extract all** at the top of the window, then **Extract**.
+3. In the folder that opens, double-click **Start Fluxo**.
+   - If Windows shows *“Windows protected your PC”*, click **More info** → **Run anyway**. Windows shows this for any file downloaded from the internet.
+4. The first time, a window installs what Fluxo needs (Node.js and its parts). This takes a few minutes; just wait.
+5. Fluxo opens in its own window. Click **Try the demo** to explore it with made-up data.
+
+After that, open Fluxo any time from the **Fluxo icon on your desktop** or the Start menu. Everything stays on your own computer.
+To remove it: restart the PC, then delete the folder and the Fluxo icon.
+
+On a Mac or Linux, use the Quick start below. To connect a real bank, see [docs/PROVIDERS.md](docs/PROVIDERS.md).
+
 ## Quick start (demo, 2 minutes)
 
 Requirements: **Node.js 24+** (uses the built-in `node:sqlite` and native TypeScript support). No database server, no Docker needed.
