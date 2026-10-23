@@ -200,6 +200,11 @@ test('command palette jumps to a page', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/transactions\?q=netflix/);
   await expect(page.getByText(/^[1-9]\d* transactions/)).toBeVisible();
+  // Reopening right after a close must stick: the browser's late "close" event belongs to the old one.
+  await page.keyboard.press('Control+k');
+  await page.evaluate(() => { const d = document.querySelector<HTMLDialogElement>('dialog[open]')!; d.close(); d.showModal(); });
+  await page.waitForTimeout(300);
+  await expect(page.getByRole('dialog', { name: 'Search' })).toBeVisible();
 });
 
 test('review inbox, paid back, hints, recap and text size', async ({ page }) => {

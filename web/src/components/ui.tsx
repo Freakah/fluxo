@@ -119,6 +119,7 @@ export function Info({ children, label }: { children: ReactNode; label?: string 
 }
 
 /** Native <dialog>: focus trap, Esc to close and inert background come from the browser. `side` slides in from the right. */
+// The native close event arrives a moment after close(); if the dialog was reopened meanwhile it is stale and ignored.
 export function Modal({ open, title, onClose, children, footer, wide, side }: { open: boolean; title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; side?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const hid = useId();
@@ -129,7 +130,7 @@ export function Modal({ open, title, onClose, children, footer, wide, side }: { 
     if (!open && d.open) d.close();
   }, [open]);
   return (
-    <dialog ref={ref} className={`modal ${wide ? 'modal-wide' : ''} ${side ? 'modal-side' : ''}`} aria-labelledby={hid} onClose={onClose} onCancel={(e) => { e.preventDefault(); onClose(); }}
+    <dialog ref={ref} className={`modal ${wide ? 'modal-wide' : ''} ${side ? 'modal-side' : ''}`} aria-labelledby={hid} onClose={(e) => { if (!e.currentTarget.open) onClose(); }} onCancel={(e) => { e.preventDefault(); onClose(); }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       {open && (
         <div className="modal-inner">
