@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { all, get, run, tx, nowIso } from '../db/db.ts';
 import { body, HttpError, uid, clientIp, type Deps, type Env } from '../context.ts';
 import { hashToken } from '../security/sessions.ts';
-import { syncConnection, upsertAccounts, sealSession, MANUAL_COOLDOWN_MS, postProcess } from '../sync/engine.ts';
+import { syncConnection, upsertAccounts, sealSession, MANUAL_COOLDOWN_MS, RATE_LIMITED, postProcess } from '../sync/engine.ts';
 import { open } from '../security/secretbox.ts';
 import { deleteImportedData, logDeletion } from '../domain/lifecycle.ts';
 import { ProviderError } from '../providers/types.ts';
@@ -23,8 +23,8 @@ export function bankRoutes(deps: Deps) {
     return p;
   };
   const ownConn = (userId: number, id: number) => {
-    const c = get<{ id: number; provider: string; status: string; provider_session_enc: string | null; last_attempt_at: string | null; institution_name: string; institution_country: string }>(db,
-      'SELECT id, provider, status, provider_session_enc, last_attempt_at, institution_name, institution_country FROM connections WHERE id = ? AND user_id = ?', id, userId);
+    const c = get<{ id: number; provider: string; status: string; provider_session_enc: string | null; last_attempt_at: string | null; last_error_code: string | null; next_sync_after: string | null; institution_name: string; institution_country: string }>(db,
+      'SELECT id, provider, status, provider_session_enc, last_attempt_at, last_error_code, next_sync_after, institution_name, institution_country FROM connections WHERE id = ? AND user_id = ?', id, userId);
     if (!c) throw new HttpError(404, 'Connection not found');
     return c;
   };
@@ -124,6 +124,9 @@ export function bankRoutes(deps: Deps) {
   app.post('/connections/:id/sync', async (c) => {
     const conn = ownConn(uid(c), Number(c.req.param('id')));
     if (!['active', 'error'].includes(conn.status)) throw new HttpError(409, 'This connection is not active. Reconnect it first.');
+    if (conn.last_error_code === RATE_LIMITED && conn.next_sync_after && Date.parse(conn.next_sync_after) > Date.now()) {
+      throw new HttpError(429, 'Your bank asked Fluxo to wait before fetching again. Fluxo will try again automatically.');
+    }
     if (conn.last_attempt_at && Date.now() - Date.parse(conn.last_attempt_at) < MANUAL_COOLDOWN_MS) {
       throw new HttpError(429, 'This connection was refreshed a few minutes ago. Banks limit how often data can be fetched; try again later.');
     }

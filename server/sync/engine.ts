@@ -21,6 +21,7 @@ const MAX_PAGES = 500;
 const LOCK_MS = 10 * 60_000;
 export const MAX_BACKGROUND_PER_DAY = 4;
 export const MANUAL_COOLDOWN_MS = 10 * 60_000;
+export const RATE_LIMITED = 'RATE_LIMITED';
 
 export type SyncCtx = { db: DB; providers: Record<string, BankProvider>; key: Buffer; intervalHours: number; now?: () => Date };
 export type SyncResult = { status: 'success' | 'partial' | 'failed' | 'skipped'; inserted: number; updated: number; fetched: number; message?: string };
@@ -142,6 +143,12 @@ export function applyStatement(db: DB, acct: Acct, txs: ProviderTx[], dateFrom: 
   return { inserted, updated };
 }
 
+/** Uses one of today's background fetches for a connection. False when the daily limit is already used up. */
+function takeBackgroundFetch(db: DB, connectionId: number, today: string): boolean {
+  return run(db, `UPDATE connections SET background_fetches_count = CASE WHEN background_fetches_day = ? THEN background_fetches_count + 1 ELSE 1 END, background_fetches_day = ?
+    WHERE id = ? AND (background_fetches_day IS NOT ? OR background_fetches_count < ?)`, today, today, connectionId, today, MAX_BACKGROUND_PER_DAY).changes === 1;
+}
+
 function backoffMs(failures: number) { return Math.min(15 * 60_000 * 2 ** Math.max(0, failures - 1), 6 * 3600_000); }
 
 export async function syncConnection(ctx: SyncCtx, connectionId: number, opts: { trigger: 'scheduled' | 'manual' | 'initial'; psu?: PsuContext } = { trigger: 'scheduled' }): Promise<SyncResult> {
@@ -161,13 +168,10 @@ export async function syncConnection(ctx: SyncCtx, connectionId: number, opts: {
     return { status: 'skipped', inserted: 0, updated: 0, fetched: 0, message: 'Consent expired' };
   }
 
-  if (opts.trigger === 'scheduled') {
-    const count = conn.background_fetches_day === today ? conn.background_fetches_count : 0;
-    if (count >= MAX_BACKGROUND_PER_DAY) {
-      run(db, 'UPDATE connections SET next_sync_after = ? WHERE id = ?', new Date(now.getTime() + 3600_000).toISOString(), conn.id);
-      return { status: 'skipped', inserted: 0, updated: 0, fetched: 0, message: 'Daily background limit reached' };
-    }
-    run(db, 'UPDATE connections SET background_fetches_day = ?, background_fetches_count = ? WHERE id = ?', today, count + 1, conn.id);
+  let countedBackground = opts.trigger === 'scheduled';
+  if (countedBackground && !takeBackgroundFetch(db, conn.id, today)) {
+    run(db, 'UPDATE connections SET next_sync_after = ? WHERE id = ?', new Date(now.getTime() + 3600_000).toISOString(), conn.id);
+    return { status: 'skipped', inserted: 0, updated: 0, fetched: 0, message: 'Daily background limit reached' };
   }
 
   const provider = ctx.providers[conn.provider];
@@ -192,6 +196,11 @@ export async function syncConnection(ctx: SyncCtx, connectionId: number, opts: {
       try { txs = await fetchAll(provider, ref, acct.provider_account_uid!, dateFrom, psu); } catch (e) {
         if (!(e instanceof ProviderError && e.code === 'PSU_HEADER_NOT_PROVIDED' && psu)) throw e;
         psu = null; // bank wants a header set we can't honestly supply: fetch as a background request instead
+        // ...which then counts against the same daily background limit as scheduled syncs.
+        if (!countedBackground) {
+          if (!takeBackgroundFetch(db, conn.id, today)) throw new ProviderError('rate_limited', 'DAILY_BACKGROUND_LIMIT', 'Daily background limit reached', 3600);
+          countedBackground = true;
+        }
         txs = await fetchAll(provider, ref, acct.provider_account_uid!, dateFrom, psu);
       }
       const balances = await provider.getBalances(ref, acct.provider_account_uid!, psu).catch((e) => { if (e instanceof ProviderError && e.kind !== 'temporary') throw e; return []; });
@@ -239,7 +248,8 @@ export async function syncConnection(ctx: SyncCtx, connectionId: number, opts: {
       } else {
         const wait = e.kind === 'rate_limited' ? (e.retryAfterSec ?? 21600) * 1000 : backoffMs(failuresN);
         run(db, "UPDATE connections SET status = CASE WHEN ? THEN 'error' ELSE status END, failure_count = ?, last_error_code = ?, last_error_message = ?, next_sync_after = ? WHERE id = ?",
-          e.kind === 'rate_limited' ? 0 : 1, failuresN, e.code, friendly(e), new Date(now.getTime() + wait).toISOString(), c.id);
+          // One stable code for every bank's rate-limit error, so "Sync now" can respect the wait.
+          e.kind === 'rate_limited' ? 0 : 1, failuresN, e.kind === 'rate_limited' ? RATE_LIMITED : e.code, friendly(e), new Date(now.getTime() + wait).toISOString(), c.id);
       }
       notify(db, c.user_id, { kind: 'sync', key: `sync:${c.id}:${e.code}:${today}`, title: e.kind === 'consent_expired' || e.kind === 'revoked' ? 'Reconnect your bank' : 'Sync problem', body: `${c.institution_name}: ${friendly(e)}`, link: '/accounts', severity: 'warning' });
     }

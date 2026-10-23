@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { all, get, run } from '../server/db/db.ts';
-import { testApp, client, fakeProvider, tx, acct } from './helpers.ts';
+import { testApp, client, fakeProvider, tx, acct, connect } from './helpers.ts';
 import { todayIn } from '../shared/dates.ts';
 import { hashToken } from '../server/security/sessions.ts';
 
@@ -365,5 +365,31 @@ describe('review inbox, paid back and highlights', () => {
     await c.put('/api/me/settings', { language: 'en' });
     expect(Object.fromEntries((await cats()).map((x) => [x.key, x.name]))).toMatchObject({ groceries: 'Groceries', shopping: 'Lojas' });
     expect((await c.put('/api/me/settings', { language: 'fr' })).status).toBe(400);
+  });
+});
+
+describe('audit fixes', () => {
+  it('a deleted expense stops counting the money that paid it back', async () => {
+    const { app } = testApp();
+    const c = await registered(app, 'payback@example.com');
+    const dinner = (await c.post('/api/transactions/manual', { date: today, amount: '-40.00', description: 'Jantar' })).json.id;
+    const friend = (await c.post('/api/transactions/manual', { date: today, amount: '20.00', description: 'MB WAY Ana' })).json.id;
+    await c.put('/api/paid-back', { expenseId: dinner, incomingId: friend, linked: true });
+    expect((await c.get('/api/dashboard')).json.totals[0].spending).toBe(2000);
+    expect((await c.del(`/api/transactions/${dinner}`)).status).toBe(200);
+    expect((await c.get(`/api/transactions/${friend}`)).json).toMatchObject({ type: 'income', paidBackFor: null });
+    expect((await c.get('/api/dashboard')).json.totals[0].spending).toBe(0);
+  });
+
+  it('"Sync now" waits while the bank has asked for a pause', async () => {
+    const p = fakeProvider({ statement: () => [] });
+    const { app, db } = testApp({ providers: { fake: p } });
+    const c = await registered(app, 'wait@example.com');
+    const { connectionId } = connect(db, get<{ id: number }>(db, 'SELECT id FROM users WHERE email = ?', 'wait@example.com')!.id);
+    run(db, 'UPDATE connections SET last_error_code = ?, next_sync_after = ?', 'RATE_LIMITED', new Date(Date.now() + 3600_000).toISOString());
+    expect((await c.post(`/api/connections/${connectionId}/sync`)).status).toBe(429);
+    expect(p.calls).toHaveLength(0);
+    run(db, 'UPDATE connections SET next_sync_after = ?', new Date(Date.now() - 1000).toISOString());
+    expect((await c.post(`/api/connections/${connectionId}/sync`)).json.status).toBe('success');
   });
 });

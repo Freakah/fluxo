@@ -841,6 +841,7 @@ export const pt: Record<string, string> = {
   'That code is not valid.': 'Esse código não é válido.',
   'This category is required and cannot be archived.': 'Esta categoria é obrigatória e não pode ser arquivada.',
   'This connection is not active. Reconnect it first.': 'Esta ligação não está ativa. Volte a ligá-la primeiro.',
+  'Your bank asked Fluxo to wait before fetching again. Fluxo will try again automatically.': 'O seu banco pediu ao Fluxo para esperar antes de voltar a ir buscar dados. O Fluxo tenta de novo automaticamente.',
   'This connection was refreshed a few minutes ago. Banks limit how often data can be fetched; try again later.': 'Esta ligação foi atualizada há poucos minutos. Os bancos limitam quantas vezes se pode ir buscar dados; tente mais tarde.',
   'Transaction not found': 'Movimento não encontrado',
   'Something went wrong on the server. Your data was not changed by this request. Try again; if it persists, see the troubleshooting guide.': 'Algo correu mal no servidor. Os seus dados não foram alterados. Tente novamente; se continuar, veja o guia de resolução de problemas.',

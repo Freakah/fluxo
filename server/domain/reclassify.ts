@@ -46,6 +46,12 @@ export function syncPaidBack(db: DB, userId: number) {
     WHERE user_id = ? AND paid_back_for_id IS NOT NULL`, userId);
 }
 
+/** Before expenses are deleted: payments that paid them back stop being refunds, so spending is not understated. */
+export function unlinkPaidBack(db: DB, userId: number, expenseIdsSql: string, ...params: (number | string)[]) {
+  run(db, `UPDATE transactions SET paid_back_for_id = NULL, type_override = NULL, category_override_id = NULL, updated_at = ?
+    WHERE user_id = ? AND paid_back_for_id IN (${expenseIdsSql})`, nowIso(), userId, ...params);
+}
+
 /** Classification preview without writing (used by the rule preview endpoint). */
 export function previewRule(db: DB, userId: number, rule: Omit<Rule, 'id'>): { id: number; merchant: string; description: string; booking_date: string; amount_minor: number; currency: string; current_category_id: number | null; overridden: boolean }[] {
   const rows = all<Row & { booking_date: string; currency: string; eff_cat: number | null; category_override_id: number | null }>(db,

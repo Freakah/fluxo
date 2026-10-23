@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { all, get, run, tx, nowIso } from '../db/db.ts';
 import { body, HttpError, uid, type Deps, type Env } from '../context.ts';
 import { txFilterSchema, txWhere, TX_SELECT, TX_ORDER } from '../domain/txquery.ts';
-import { reclassify, detectTransfers, previewRule, unpairTransfer, syncPaidBack } from '../domain/reclassify.ts';
+import { reclassify, detectTransfers, previewRule, unpairTransfer, syncPaidBack, unlinkPaidBack } from '../domain/reclassify.ts';
 import { detectRecurring } from '../domain/recurring.ts';
 import { checkBudgetAlerts, userSettings } from '../domain/notifications.ts';
 import { toCsv, textCell, numberCell } from '../domain/csv.ts';
@@ -180,7 +180,10 @@ export function dataRoutes(deps: Deps) {
   app.delete('/transactions/:id', (c) => {
     const id = Number(c.req.param('id'));
     // Only manual entries can be deleted; imported bank facts are never deleted by the user here.
-    const r = run(db, "DELETE FROM transactions WHERE id = ? AND user_id = ? AND source = 'manual'", id, uid(c));
+    const r = tx(db, () => {
+      unlinkPaidBack(db, uid(c), "SELECT id FROM transactions WHERE id = ? AND source = 'manual'", id);
+      return run(db, "DELETE FROM transactions WHERE id = ? AND user_id = ? AND source = 'manual'", id, uid(c));
+    });
     if (!r.changes) throw new HttpError(400, 'Only manual entries can be deleted. Imported transactions can be excluded from reports instead.');
     refreshDerived(uid(c));
     return c.json({ ok: true });

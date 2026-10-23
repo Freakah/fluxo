@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { all, get, run } from '../server/db/db.ts';
 import { syncConnection, upsertAccounts, recoverInterrupted, dueConnections, MAX_BACKGROUND_PER_DAY } from '../server/sync/engine.ts';
 import { totals } from '../server/domain/aggregate.ts';
+import { deleteImportedData } from '../server/domain/lifecycle.ts';
 import { ProviderError, type ProviderTx } from '../server/providers/types.ts';
 import { freshDb, user, fakeProvider, connect, ctxFor, tx, acct } from './helpers.ts';
 import { todayIn, addDays } from '../shared/dates.ts';
@@ -140,6 +141,7 @@ describe('sync engine', () => {
     await syncConnection(ctxFor(db, p), connectionId, { trigger: 'initial' });
     const c = get<{ status: string; next_sync_after: string }>(db, 'SELECT status, next_sync_after FROM connections')!;
     expect(c.status).toBe('active');
+    expect(get<{ last_error_code: string }>(db, 'SELECT last_error_code FROM connections')!.last_error_code).toBe('RATE_LIMITED');
     expect(Date.parse(c.next_sync_after) - Date.now()).toBeGreaterThan(5.9 * 3600_000);
     expect(dueConnections(db, new Date())).not.toContain(connectionId);
   });
@@ -152,6 +154,37 @@ describe('sync engine', () => {
     for (let i = 0; i < MAX_BACKGROUND_PER_DAY + 2; i++) await syncConnection(ctxFor(db, p), connectionId, { trigger: 'scheduled' });
     expect(p.calls).toHaveLength(MAX_BACKGROUND_PER_DAY);
     expect(p.calls.every((c) => c.psu === null)).toBe(true); // background requests never claim the user is present
+  });
+
+  it('counts a manual refresh that falls back to a background request against the daily limit', async () => {
+    const db = freshDb();
+    const u = user(db);
+    const { connectionId } = connect(db, u);
+    const p = fakeProvider({ statement: () => [] });
+    const background = p.getTransactions; // records only the requests that reach it (all without PSU headers)
+    p.getTransactions = async (ref, uid, o) => {
+      if (o.psu) throw new ProviderError('invalid', 'PSU_HEADER_NOT_PROVIDED', 'more headers needed');
+      return background(ref, uid, o);
+    };
+    const psu = { ipAddress: '127.0.0.1', userAgent: 'test' };
+    for (let i = 0; i < MAX_BACKGROUND_PER_DAY + 2; i++) await syncConnection(ctxFor(db, p), connectionId, { trigger: 'manual', psu });
+    expect(p.calls).toHaveLength(MAX_BACKGROUND_PER_DAY);
+    expect(get<{ last_error_code: string }>(db, 'SELECT last_error_code FROM connections')!.last_error_code).toBe('RATE_LIMITED');
+  });
+
+  it('deleting imported data also undoes "paid back" links to it', async () => {
+    const db = freshDb();
+    const u = user(db);
+    const bank = connect(db, u, [acct('a1')]);
+    const other = connect(db, u, [acct('b1')]);
+    const p = fakeProvider({ statement: (uid) => [uid === 'a1' ? tx({ id: 'dinner', amount: '-40.00', bookingDate: today }) : tx({ id: 'mbway', amount: '20.00', bookingDate: today })] });
+    await syncConnection(ctxFor(db, p), bank.connectionId, { trigger: 'initial' });
+    await syncConnection(ctxFor(db, p), other.connectionId, { trigger: 'initial' });
+    const id = (ref: string) => get<{ id: number }>(db, 'SELECT id FROM transactions WHERE provider_tx_id = ?', ref)!.id;
+    run(db, "UPDATE transactions SET paid_back_for_id = ?, type_override = 'refund' WHERE id = ?", id('dinner'), id('mbway'));
+    deleteImportedData(db, u, bank.connectionId);
+    expect(get(db, 'SELECT paid_back_for_id, type_override FROM transactions WHERE id = ?', id('mbway'))).toEqual({ paid_back_for_id: null, type_override: null });
+    expect(spend(db, u).spending).toBe(0);
   });
 
   it('expires consent by date and notifies only once', async () => {

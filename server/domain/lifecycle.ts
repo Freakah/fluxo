@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { all, run, tx, nowIso, type DB } from '../db/db.ts';
-import { ensureDefaultCategories } from './reclassify.ts';
+import { ensureDefaultCategories, unlinkPaidBack } from './reclassify.ts';
 import { DEFAULT_SETTINGS } from '../../shared/settings.ts';
 
 export function createUser(db: DB, email: string, passwordHash: string, isDemo = false): number {
@@ -24,6 +24,7 @@ export function deleteImportedData(db: DB, userId: number, connectionId?: number
       : all<{ id: number }>(db, "SELECT id FROM accounts WHERE user_id = ? AND kind <> 'cash'", userId);
     for (const a of accts) {
       run(db, 'UPDATE transactions SET transfer_peer_id = NULL WHERE user_id = ? AND transfer_peer_id IN (SELECT id FROM transactions WHERE account_id = ?)', userId, a.id);
+      unlinkPaidBack(db, userId, 'SELECT id FROM transactions WHERE account_id = ?', a.id);
       run(db, 'DELETE FROM transactions WHERE account_id = ? AND user_id = ?', a.id, userId);
       run(db, 'DELETE FROM accounts WHERE id = ? AND user_id = ?', a.id, userId);
     }
