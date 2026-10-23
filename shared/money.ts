@@ -11,19 +11,22 @@ export function currencyExponent(currency: string): number {
   return e;
 }
 
-/** Exact decimal string -> minor units. Throws on malformed input or excess precision. */
+/** Thrown for amounts that cannot be stored exactly; the server answers 400 instead of 500. */
+export class AmountError extends Error {}
+
+/** Exact decimal string -> minor units. Throws AmountError on malformed input or excess precision. */
 export function parseAmountToMinor(value: string, currency: string): number {
   const s = value.trim();
   const m = /^([+-])?(\d+)(?:\.(\d+))?$/.exec(s);
-  if (!m) throw new Error(`Invalid amount: ${JSON.stringify(value)}`);
+  if (!m) throw new AmountError(`Invalid amount: ${JSON.stringify(value)}`);
   const exp = currencyExponent(currency);
   let frac = m[3] ?? '';
   if (frac.length > exp) {
-    if (/[^0]/.test(frac.slice(exp))) throw new Error(`Amount ${value} has more precision than ${currency} allows`);
+    if (/[^0]/.test(frac.slice(exp))) throw new AmountError(`Amount ${value} has more precision than ${currency} allows`);
     frac = frac.slice(0, exp);
   }
   const big = BigInt(m[2] + frac.padEnd(exp, '0')) * (m[1] === '-' ? -1n : 1n);
-  if (big > BigInt(Number.MAX_SAFE_INTEGER) || big < -BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Amount out of range');
+  if (big > BigInt(Number.MAX_SAFE_INTEGER) || big < -BigInt(Number.MAX_SAFE_INTEGER)) throw new AmountError('Amount out of range');
   return Number(big);
 }
 

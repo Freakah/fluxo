@@ -6,7 +6,7 @@
 // - per-account lease lock; backoff on temporary errors; provider rate limits respected
 import { createHash, randomUUID } from 'node:crypto';
 import { all, get, run, tx, nowIso, type DB } from '../db/db.ts';
-import { addDays, daysBetween, todayIn } from '../../shared/dates.ts';
+import { addDays, daysBetween, isDate, todayIn } from '../../shared/dates.ts';
 import { parseAmountToMinor } from '../../shared/money.ts';
 import { normalizeMerchant } from '../domain/merchants.ts';
 import { reclassify, detectTransfers } from '../domain/reclassify.ts';
@@ -63,6 +63,7 @@ async function fetchAll(p: BankProvider, ref: string, uid: string, dateFrom: str
   let key: string | null = null;
   for (let page = 0; page < MAX_PAGES; page++) {
     const r = await p.getTransactions(ref, uid, { dateFrom, continuationKey: key, psu });
+    if (!r.transactions.every(readable)) throw new ProviderError('invalid', 'MALFORMED_TRANSACTION', 'The bank sent a transaction Fluxo could not read');
     out.push(...r.transactions);
     key = r.continuationKey;
     if (!key) return out;
@@ -71,6 +72,13 @@ async function fetchAll(p: BankProvider, ref: string, uid: string, dateFrom: str
   }
   throw new ProviderError('temporary', 'TOO_MANY_PAGES', 'Too many pages returned by the provider');
 }
+
+/** Bank data is untrusted: a row with an impossible date or amount would silently skew totals, so the whole page is refused. */
+function readable(t: ProviderTx): boolean {
+  if (!isDate(t.bookingDate) || (t.valueDate !== null && !isDate(t.valueDate)) || !/^[A-Z]{3}$/.test(t.currency) || typeof t.description !== 'string') return false;
+  return amountOk(t.amount, t.currency);
+}
+const amountOk = (amount: string, currency: string) => { try { parseAmountToMinor(amount, currency); return true; } catch { return false; } };
 
 type Existing = { id: number; status: string; amount_minor: number; booking_date: string; description: string; merchant: string };
 
@@ -209,7 +217,8 @@ export async function syncConnection(ctx: SyncCtx, connectionId: number, opts: {
         const r = applyStatement(db, acct, txs, dateFrom, now);
         inserted = inserted.concat(r.inserted);
         updated += r.updated;
-        const b = balances.find((x) => x.currency === acct.currency) ?? balances[0];
+        const ok = balances.filter((x) => amountOk(x.amount, x.currency)); // an unreadable balance must not block the transactions
+        const b = ok.find((x) => x.currency === acct.currency) ?? ok[0];
         if (b) run(db, 'UPDATE accounts SET balance_minor = ?, balance_type = ?, balance_label = ?, balance_at = ? WHERE id = ?', parseAmountToMinor(b.amount, b.currency), b.type, b.label, b.at ?? now.toISOString(), acct.id);
         run(db, 'UPDATE accounts SET synced_through = ?, initial_sync_done = 1 WHERE id = ?', today, acct.id);
       });
@@ -258,6 +267,7 @@ export async function syncConnection(ctx: SyncCtx, connectionId: number, opts: {
 }
 
 export function friendly(e: ProviderError): string {
+  if (e.code === 'MALFORMED_TRANSACTION') return 'The bank sent a transaction Fluxo could not read. Nothing was imported for this account; we will try again later.';
   switch (e.kind) {
     case 'consent_expired': return 'Bank access expired. Reconnect to resume syncing.';
     case 'revoked': return 'Access was revoked at the bank. Reconnect to resume syncing.';

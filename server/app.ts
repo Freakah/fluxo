@@ -14,6 +14,9 @@ import { insightRoutes } from './routes/insights.ts';
 import { privacyRoutes } from './routes/privacy.ts';
 import { userSettings } from './domain/notifications.ts';
 import { log } from './log.ts';
+import { AmountError } from '../shared/money.ts';
+
+const AMOUNT_ERROR = 'That amount is not valid: it is too large or has more decimals than your currency allows.';
 
 const WEB_DIST = path.resolve(import.meta.dirname, '../web/dist');
 
@@ -34,6 +37,7 @@ export function createApp(deps: Deps) {
 
   app.onError((err, c) => {
     if (err instanceof HttpError) return c.json({ error: err.message }, err.status as 400);
+    if (err instanceof AmountError) return c.json({ error: AMOUNT_ERROR }, 400);
     log.error('unhandled error', { path: c.req.path, err: err instanceof Error ? err.message : 'unknown' });
     return c.json({ error: 'Something went wrong on the server. Your data was not changed by this request. Try again; if it persists, see the troubleshooting guide.' }, 500);
   });

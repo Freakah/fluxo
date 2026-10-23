@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { all, get, run, tx, nowIso } from '../db/db.ts';
 import { body, HttpError, uid, type Deps, type Env } from '../context.ts';
 import { txFilterSchema, txWhere, TX_SELECT, TX_ORDER } from '../domain/txquery.ts';
+import { EFF_TYPE } from '../domain/aggregate.ts';
 import { reclassify, detectTransfers, previewRule, unpairTransfer, syncPaidBack, unlinkPaidBack } from '../domain/reclassify.ts';
 import { detectRecurring } from '../domain/recurring.ts';
 import { checkBudgetAlerts, userSettings } from '../domain/notifications.ts';
@@ -148,11 +149,13 @@ export function dataRoutes(deps: Deps) {
   app.put('/paid-back', async (c) => {
     const b = await body(c, z.object({ expenseId: z.number().int(), incomingId: z.number().int(), linked: z.boolean() }));
     const userId = uid(c);
-    const exp = get<{ amount_minor: number; currency: string; cat: number | null }>(db, 'SELECT amount_minor, currency, COALESCE(category_override_id, auto_category_id) cat FROM transactions WHERE id = ? AND user_id = ?', b.expenseId, userId);
-    const inc = get<{ amount_minor: number; currency: string; paid_back_for_id: number | null }>(db, 'SELECT amount_minor, currency, paid_back_for_id FROM transactions WHERE id = ? AND user_id = ?', b.incomingId, userId);
+    const exp = get<{ amount_minor: number; currency: string; cat: number | null; type: string }>(db, `SELECT amount_minor, currency, COALESCE(category_override_id, auto_category_id) cat, ${EFF_TYPE} type FROM transactions t WHERE id = ? AND user_id = ?`, b.expenseId, userId);
+    const inc = get<{ amount_minor: number; currency: string; paid_back_for_id: number | null; type: string }>(db, `SELECT amount_minor, currency, paid_back_for_id, ${EFF_TYPE} type FROM transactions t WHERE id = ? AND user_id = ?`, b.incomingId, userId);
     if (!exp || !inc) throw new HttpError(404, 'Transaction not found');
     if (b.linked) {
       if (exp.amount_minor >= 0 || inc.amount_minor <= 0 || exp.currency !== inc.currency) throw new HttpError(400, 'Pick a payment you made and money you received in the same currency.');
+      // Money moved between your own accounts is not someone paying you back; linking it would hide real spending.
+      if (exp.type === 'transfer' || inc.type === 'transfer') throw new HttpError(400, 'Transfers between your own accounts cannot be marked as paid back.');
       run(db, "UPDATE transactions SET paid_back_for_id = ?, type_override = 'refund', category_override_id = ?, reviewed_at = ?, updated_at = ? WHERE id = ?", b.expenseId, exp.cat, nowIso(), nowIso(), b.incomingId);
     } else if (inc.paid_back_for_id === b.expenseId) {
       run(db, 'UPDATE transactions SET paid_back_for_id = NULL, type_override = NULL, category_override_id = NULL, updated_at = ? WHERE id = ?', nowIso(), b.incomingId);

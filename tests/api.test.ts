@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { all, get, run } from '../server/db/db.ts';
-import { testApp, client, fakeProvider, tx, acct, connect } from './helpers.ts';
+import { testApp, client, fakeProvider, tx, acct, connect, KEY } from './helpers.ts';
+import { syncConnection } from '../server/sync/engine.ts';
+import type { ProviderTx } from '../server/providers/types.ts';
 import { todayIn } from '../shared/dates.ts';
 import { hashToken } from '../server/security/sessions.ts';
 
@@ -391,5 +393,38 @@ describe('audit fixes', () => {
     expect(p.calls).toHaveLength(0);
     run(db, 'UPDATE connections SET next_sync_after = ?', new Date(Date.now() - 1000).toISOString());
     expect((await c.post(`/api/connections/${connectionId}/sync`)).json.status).toBe('success');
+  });
+});
+
+describe('QA fixes', () => {
+  it('refuses amounts that cannot be stored exactly with a clear 400, not a server error', async () => {
+    const { app } = testApp();
+    const c = await registered(app, 'amounts@example.com');
+    const huge = '99999999999999999999';
+    for (const r of [
+      await c.post('/api/transactions/manual', { date: today, amount: `-${huge}`, description: 'x' }),
+      await c.put('/api/budgets', { categoryId: null, amount: huge }),
+      await c.get(`/api/transactions?min=${huge}`),
+    ]) expect(r).toMatchObject({ status: 400, json: { error: expect.stringContaining('amount is not valid') } });
+    await c.put('/api/me/settings', { currency: 'JPY' }); // no minor units: "1.50" yen cannot exist
+    expect((await c.post('/api/transactions/manual', { date: today, amount: '-1.50', description: 'x' })).status).toBe(400);
+    expect((await c.post('/api/transactions/manual', { date: today, amount: '-150', description: 'x' })).status).toBe(200);
+  });
+
+  it('a transfer between your own accounts cannot be marked as paid back', async () => {
+    const st: Record<string, ProviderTx[]> = {
+      a1: [tx({ id: 'dinner', amount: '-40.00', bookingDate: today, description: 'JANTAR' }), tx({ id: 'in', amount: '20.00', bookingDate: today, description: 'TRF' })],
+      a2: [tx({ id: 'out', amount: '-20.00', bookingDate: today, description: 'TRF' })],
+    };
+    const p = fakeProvider({ statement: (u) => st[u], accounts: [acct('a1'), acct('a2')] });
+    const { app, db } = testApp({ providers: { fake: p } });
+    const c = await registered(app, 'transfer@example.com');
+    const { connectionId } = connect(db, get<{ id: number }>(db, 'SELECT id FROM users')!.id, [acct('a1'), acct('a2')]);
+    await syncConnection({ db, providers: { fake: p }, key: KEY, intervalHours: 6 }, connectionId, { trigger: 'manual' });
+    const id = (amount: number) => get<{ id: number }>(db, 'SELECT id FROM transactions WHERE amount_minor = ?', amount)!.id;
+    expect((await c.get(`/api/transactions/${id(2000)}`)).json.type).toBe('transfer');
+    const r = await c.put('/api/paid-back', { expenseId: id(-4000), incomingId: id(2000), linked: true });
+    expect(r.status).toBe(400);
+    expect((await c.get('/api/dashboard')).json.totals[0].spending).toBe(4000);
   });
 });

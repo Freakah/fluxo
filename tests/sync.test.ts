@@ -122,6 +122,34 @@ describe('sync engine', () => {
     expect(get<{ status: string; failure_count: number }>(db, 'SELECT status, failure_count FROM connections')).toMatchObject({ status: 'active', failure_count: 0 });
   });
 
+  it('refuses a bank page with an unreadable transaction, says so, and imports once the bank sends valid data', async () => {
+    const db = freshDb();
+    const u = user(db);
+    const { connectionId } = connect(db, u);
+    let date = '2026-13-45';
+    const p = fakeProvider({ statement: () => [tx({ id: 'ok', amount: '-1.00', bookingDate: d(-1) }), tx({ id: 'bad', amount: '-2.00', bookingDate: date })] });
+    const r = await syncConnection(ctxFor(db, p), connectionId, { trigger: 'manual' });
+    expect(r.status).toBe('failed');
+    expect(txRows(db)).toHaveLength(0); // nothing half-imported, no impossible dates stored
+    expect(get(db, 'SELECT status, last_error_code FROM connections')).toEqual({ status: 'error', last_error_code: 'MALFORMED_TRANSACTION' });
+    expect(r.message).toMatch(/could not read/);
+    date = d(-2);
+    run(db, 'UPDATE connections SET next_sync_after = NULL, last_attempt_at = NULL');
+    expect((await syncConnection(ctxFor(db, p), connectionId, { trigger: 'manual' })).status).toBe('success');
+    expect(txRows(db)).toHaveLength(2);
+  });
+
+  it('an unreadable balance does not block importing transactions', async () => {
+    const db = freshDb();
+    const u = user(db);
+    const { connectionId } = connect(db, u);
+    const p = fakeProvider({ statement: () => [tx({ id: 'ok', amount: '-1.00', bookingDate: d(-1) })] });
+    p.getBalances = async () => [{ amount: 'n/a', currency: 'EUR', type: 'CLBD', label: 'Booked', at: null }];
+    expect((await syncConnection(ctxFor(db, p), connectionId, { trigger: 'manual' })).status).toBe('success');
+    expect(txRows(db)).toHaveLength(1);
+    expect(get(db, 'SELECT balance_minor FROM accounts')).toEqual({ balance_minor: null });
+  });
+
   it('records a partial failure when one of several accounts fails', async () => {
     const db = freshDb();
     const u = user(db);
